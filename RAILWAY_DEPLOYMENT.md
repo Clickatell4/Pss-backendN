@@ -7,7 +7,8 @@
 2. Sign up with GitHub (free, no card required)
 3. Click "Deploy from GitHub repo"
 4. Select your `Pss-backendN` repository
-5. Railway will automatically detect Django and deploy
+5. **IMPORTANT**: In project settings, delete any existing service first
+6. Re-deploy to force Railway to use the new Dockerfile configuration
 
 ### Step 2: Add PostgreSQL Database
 1. In your Railway project dashboard

@@ -1,3 +1,4 @@
+# Use Python 3.11.9 official image
 FROM python:3.11.9-slim
 
 # Set environment variables
@@ -9,25 +10,34 @@ ENV PORT=8000
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        postgresql-client \
-        build-essential \
-        libpq-dev \
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    build-essential \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Upgrade pip
+RUN python -m pip install --upgrade pip
+
 # Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir --timeout=300 -r requirements.txt
 
-# Copy project
-COPY . .
+# Copy project files
+COPY . /app/
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
+# Create necessary directories
+RUN mkdir -p /app/staticfiles /app/logs
+
+# Collect static files (allow failure in case of missing SECRET_KEY)
+RUN python manage.py collectstatic --noinput || echo "Static files collection failed - will retry at runtime"
 
 # Expose port
 EXPOSE $PORT
 
-# Run the application
-CMD python manage.py migrate && gunicorn pss_backend.wsgi:application --bind 0.0.0.0:$PORT
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:$PORT/ || exit 1
+
+# Start command
+CMD ["sh", "-c", "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn pss_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120"]
