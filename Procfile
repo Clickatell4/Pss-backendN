@@ -1,1 +1,1 @@
-web: gunicorn pss_backend.wsgi --log-file -
+web: gunicorn pss_backend.pss_backend.wsgi --log-file -
