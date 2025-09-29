@@ -43,5 +43,9 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 HEALTHCHECK --interval=30s --timeout=30s --start-period=180s --retries=5 \
   CMD curl -f http://localhost:$PORT/ || exit 1
 
-# Start command - simplified
-CMD python manage.py migrate && python manage.py collectstatic --noinput && gunicorn pss_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level debug
+# Copy and make start script executable
+COPY start.sh .
+RUN chmod +x start.sh
+
+# Start command
+CMD ["./start.sh"]
