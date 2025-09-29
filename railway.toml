@@ -3,6 +3,6 @@ builder = "dockerfile"
 
 [deploy]
 startCommand = "python manage.py migrate && gunicorn pss_backend.wsgi:application --bind 0.0.0.0:$PORT"
-healthcheckPath = "/"
-healthcheckTimeout = 100
+healthcheckPath = "/api/"
+healthcheckTimeout = 300
 restartPolicyType = "on_failure"

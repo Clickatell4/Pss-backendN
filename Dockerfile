@@ -35,9 +35,12 @@ RUN python manage.py collectstatic --noinput || echo "Static files collection fa
 # Expose port
 EXPOSE $PORT
 
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:$PORT/ || exit 1
+HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:$PORT/api/ || exit 1
 
 # Start command
-CMD ["sh", "-c", "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn pss_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120"]
+CMD ["sh", "-c", "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn pss_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 300 --keep-alive 2 --max-requests 1000 --max-requests-jitter 50"]
