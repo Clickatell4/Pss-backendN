@@ -5,6 +5,7 @@ FROM python:3.11.9-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8000
+ENV DJANGO_SETTINGS_MODULE=pss_backend.settings
 
 # Set work directory
 WORKDIR /app
@@ -39,8 +40,8 @@ EXPOSE $PORT
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:$PORT/api/ || exit 1
+HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=3 \
+  CMD curl -f http://localhost:$PORT/ || exit 1
 
-# Start command
-CMD ["sh", "-c", "python manage.py migrate && python manage.py collectstatic --noinput && gunicorn pss_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 300 --keep-alive 2 --max-requests 1000 --max-requests-jitter 50"]
+# Start command - simpler for debugging
+CMD ["sh", "-c", "python manage.py migrate && python manage.py collectstatic --noinput && exec gunicorn pss_backend.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --access-logfile - --error-logfile -"]
