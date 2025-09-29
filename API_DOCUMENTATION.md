@@ -1,312 +1,310 @@
 # PSS Backend API Documentation
 
-## Overview
-Django REST API backend for the Personal Support System (PSS) application designed for CAPACITI students with disabilities.
-
-## Project Structure
-```
-Pss-backendN/
-├── manage.py                    # Django management script
-├── apps/                        # Django applications
-│   ├── authentication/          # JWT authentication
-│   ├── users/                   # User management & profiles
-│   ├── intake/                  # Intake form processing
-│   ├── journal/                 # Journal entries
-│   ├── admin_notes/             # Administrative notes
-│   └── dashboard/               # Dashboard statistics
-└── pss_backend/                 # Django project configuration
-    ├── settings.py              # Django settings
-    ├── urls.py                  # Main URL configuration
-    └── wsgi.py                  # WSGI application
-```
-
 ## Base URL
-- Development: `http://localhost:8000/api/`
-- Production: `https://your-domain.com/api/`
+```
+https://pss-backend-production-adc4.up.railway.app/
+```
 
 ## Authentication
-All API endpoints (except login) require JWT authentication.
-
-### Headers
+The API uses JWT (JSON Web Tokens) for authentication. Include the token in the Authorization header:
 ```
-Authorization: Bearer <access_token>
+Authorization: Bearer <your_jwt_token>
+```
+
+---
+
+## 🔐 Authentication Endpoints
+
+### Register User
+```http
+POST /api/auth/register/
 Content-Type: application/json
-```
 
-## API Endpoints
-
-### Authentication Endpoints
-
-#### Login
-- **POST** `/auth/login/`
-- **Description**: Authenticate user and receive JWT tokens
-- **Body**:
-```json
 {
-  "email": "user@capaciti.org.za",
-  "password": "password123"
+  "email": "student@capaciti.org.za",
+  "password": "secure_password",
+  "first_name": "John",
+  "last_name": "Doe",
+  "role": "candidate"
 }
 ```
-- **Response**:
+
+**Response (201):**
 ```json
 {
-  "access": "jwt_access_token",
-  "refresh": "jwt_refresh_token",
   "user": {
     "id": 1,
-    "email": "user@capaciti.org.za",
+    "email": "student@capaciti.org.za",
     "first_name": "John",
     "last_name": "Doe",
     "role": "candidate",
-    "has_completed_intake": true,
-    "created_at": "2024-01-01T00:00:00Z",
-    "updated_at": "2024-01-01T00:00:00Z",
-    "profile": { ... }
+    "has_completed_intake": false
+  },
+  "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+}
+```
+
+### Login
+```http
+POST /api/auth/login/
+Content-Type: application/json
+
+{
+  "email": "student@capaciti.org.za",
+  "password": "secure_password"
+}
+```
+
+**Response (200):**
+```json
+{
+  "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "user": {
+    "id": 1,
+    "email": "student@capaciti.org.za",
+    "first_name": "John",
+    "last_name": "Doe",
+    "role": "candidate",
+    "has_completed_intake": false
   }
 }
 ```
 
-#### Logout
-- **POST** `/auth/logout/`
-- **Description**: Blacklist refresh token
-- **Body**:
-```json
+### Logout
+```http
+POST /api/auth/logout/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
 {
-  "refresh": "jwt_refresh_token"
+  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
 }
 ```
 
-#### Refresh Token
-- **POST** `/auth/refresh/`
-- **Description**: Get new access token using refresh token
-- **Body**:
-```json
+### Get Current User
+```http
+GET /api/auth/user/
+Authorization: Bearer <access_token>
+```
+
+### Refresh Token
+```http
+POST /api/auth/token/refresh/
+Content-Type: application/json
+
 {
-  "refresh": "jwt_refresh_token"
+  "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
 }
 ```
 
-#### Current User
-- **GET** `/auth/me/`
-- **Description**: Get current authenticated user details
+---
 
-### User Management Endpoints
+## 👥 User Management
 
-#### List/Create Users
-- **GET** `/users/` - List all users (admin only)
-- **POST** `/users/` - Create new user (admin only)
+### Get User Profile
+```http
+GET /api/users/profile/
+Authorization: Bearer <access_token>
+```
 
-#### User Detail
-- **GET** `/users/{id}/` - Get user details
-- **PUT** `/users/{id}/` - Update user
-- **DELETE** `/users/{id}/` - Delete user (admin only)
+### Update User Profile
+```http
+PUT /api/users/profile/
+Authorization: Bearer <access_token>
+Content-Type: application/json
 
-#### User Profile
-- **GET** `/users/{id}/profile/` - Get user profile
-- **PUT** `/users/{id}/profile/` - Update user profile
+{
+  "first_name": "John",
+  "last_name": "Doe",
+  "date_of_birth": "1995-06-15",
+  "contact_number": "+27123456789",
+  "address": "123 Main St, Cape Town",
+  "emergency_contact": "Jane Doe",
+  "emergency_phone": "+27987654321",
+  "diagnosis": "ADHD",
+  "medications": "Ritalin 10mg daily",
+  "allergies": "None known",
+  "accommodations": "Extended time for exams",
+  "assistive_technology": "Screen reader",
+  "learning_style": "Visual learner",
+  "support_needs": "Regular check-ins",
+  "communication_preferences": "Email preferred"
+}
+```
 
-#### Candidates List
-- **GET** `/users/candidates/` - List all candidates (admin only)
-- **Response**:
+---
+
+## 📝 Intake Form
+
+### Submit Intake Form
+```http
+POST /api/intake/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "personal_info": {
+    "date_of_birth": "1995-06-15",
+    "id_number": "9506150123456",
+    "contact_number": "+27123456789",
+    "address": "123 Main St, Cape Town"
+  },
+  "emergency_contact": {
+    "name": "Jane Doe",
+    "phone": "+27987654321"
+  },
+  "medical_info": {
+    "diagnosis": "ADHD",
+    "medications": "Ritalin 10mg daily",
+    "allergies": "None known",
+    "medical_notes": "Regular monitoring required",
+    "doctor_name": "Dr. Smith",
+    "doctor_phone": "+27111222333"
+  },
+  "accommodation_needs": {
+    "accommodations": "Extended time for exams",
+    "assistive_technology": "Screen reader",
+    "learning_style": "Visual learner",
+    "support_needs": "Regular check-ins",
+    "communication_preferences": "Email preferred"
+  }
+}
+```
+
+### Get User's Intake Form
+```http
+GET /api/intake/
+Authorization: Bearer <access_token>
+```
+
+---
+
+## 📖 Journal Entries
+
+### Create Journal Entry
+```http
+POST /api/journal/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "title": "Today's Reflection",
+  "content": "Had a great day learning React. Feeling confident about the upcoming project.",
+  "mood": "positive",
+  "tags": ["learning", "react", "confidence"]
+}
+```
+
+### Get All Journal Entries
+```http
+GET /api/journal/
+Authorization: Bearer <access_token>
+```
+
+**Optional Query Parameters:**
+- `?mood=positive` - Filter by mood
+- `?date=2025-09-29` - Filter by date
+- `?search=react` - Search in title/content
+
+### Get Specific Journal Entry
+```http
+GET /api/journal/{id}/
+Authorization: Bearer <access_token>
+```
+
+### Update Journal Entry
+```http
+PUT /api/journal/{id}/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "title": "Updated Title",
+  "content": "Updated content",
+  "mood": "neutral"
+}
+```
+
+### Delete Journal Entry
+```http
+DELETE /api/journal/{id}/
+Authorization: Bearer <access_token>
+```
+
+---
+
+## 📊 Dashboard Data
+
+### Get Dashboard Overview
+```http
+GET /api/dashboard/
+Authorization: Bearer <access_token>
+```
+
+**Response:**
 ```json
 {
-  "count": 25,
-  "results": [
+  "user_stats": {
+    "total_journal_entries": 15,
+    "entries_this_week": 3,
+    "entries_this_month": 12,
+    "most_common_mood": "positive",
+    "intake_completed": true
+  },
+  "recent_entries": [
     {
       "id": 1,
-      "first_name": "John",
-      "last_name": "Doe",
-      "email": "john.doe@capaciti.org.za",
-      "has_completed_intake": true,
-      "profile": {
-        "diagnosis": "Visual impairment",
-        "accommodations": "Screen reader support"
-      },
-      "journal_stats": {
-        "total_entries": 5,
-        "last_entry_date": "2024-01-15",
-        "recent_barriers": 0,
-        "avg_energy_level": 7.2
-      },
-      "admin_notes_count": 2
+      "title": "Today's Reflection",
+      "mood": "positive",
+      "created_at": "2025-09-29T10:30:00Z"
     }
-  ]
-}
-```
-
-### Intake Endpoints
-
-#### Submit Intake
-- **POST** `/intake/`
-- **Description**: Submit or update intake information
-- **Body**:
-```json
-{
-  "intake_data": {
-    "date_of_birth": "1990-01-01",
-    "id_number": "9001010000000",
-    "contact_number": "+27123456789",
-    "address": "123 Main St, Cape Town",
-    "emergency_contact": "Jane Doe",
-    "emergency_phone": "+27987654321",
-    "diagnosis": "Visual impairment",
-    "medications": "None",
-    "allergies": "None",
-    "medical_notes": "Requires screen reader",
-    "doctor_name": "Dr. Smith",
-    "doctor_phone": "+27111222333",
-    "accommodations": "Screen reader, extra time for tests",
-    "assistive_technology": "JAWS screen reader",
-    "learning_style": "Auditory",
-    "support_needs": "Technical support for assistive technology",
-    "communication_preferences": "Email and verbal communication"
+  ],
+  "mood_distribution": {
+    "positive": 8,
+    "neutral": 5,
+    "negative": 2
   }
 }
 ```
 
-#### Get Intake Details
-- **GET** `/intake/{user_id}/`
-- **Description**: Get intake details for a specific user
+---
 
-### Journal Endpoints
+## 📝 Admin Notes (Admin Only)
 
-#### List/Create Journal Entries
-- **GET** `/journal/` - List user's journal entries
-- **POST** `/journal/` - Create new journal entry
-- **Body**:
-```json
+### Create Admin Note
+```http
+POST /api/admin-notes/
+Authorization: Bearer <admin_access_token>
+Content-Type: application/json
+
 {
-  "date": "2024-01-15",
-  "mood": "good",
-  "energy_level": 7,
-  "activities": "Attended classes, completed assignments",
-  "challenges": "Had difficulty with online platform",
-  "achievements": "Completed Python module",
-  "notes": "Feeling confident about progress",
-  "barriers_faced": "Technical issues with screen reader",
-  "barrier_count": 1
+  "student_id": 1,
+  "title": "Check-in Meeting",
+  "content": "Student is progressing well. Discussed upcoming project deadlines.",
+  "category": "check-in",
+  "is_private": false
 }
 ```
 
-#### Journal Entry Detail
-- **GET** `/journal/{id}/` - Get specific journal entry
-- **PUT** `/journal/{id}/` - Update journal entry
-- **DELETE** `/journal/{id}/` - Delete journal entry
-
-#### Journal Statistics
-- **GET** `/journal/stats/`
-- **Description**: Get journal statistics for current user
-
-### Admin Notes Endpoints
-
-#### List/Create Admin Notes
-- **GET** `/admin-notes/` - List admin notes (filtered by permissions)
-- **POST** `/admin-notes/` - Create new admin note (admin only)
-- **Body**:
-```json
-{
-  "candidate": 1,
-  "category": "progress",
-  "title": "Weekly Progress Update",
-  "content": "Student is making good progress with Python fundamentals",
-  "is_important": false
-}
+### Get Admin Notes for Student
+```http
+GET /api/admin-notes/?student_id=1
+Authorization: Bearer <access_token>
 ```
 
-#### Admin Note Detail
-- **GET** `/admin-notes/{id}/` - Get specific admin note
-- **PUT** `/admin-notes/{id}/` - Update admin note
-- **DELETE** `/admin-notes/{id}/` - Delete admin note
+---
 
-#### Candidate Notes
-- **GET** `/admin-notes/candidate/{candidate_id}/`
-- **Description**: Get all admin notes for a specific candidate
-
-### Dashboard Endpoints
-
-#### Admin Dashboard Stats
-- **GET** `/dashboard/admin-stats/` (admin only)
-- **Response**:
-```json
-{
-  "total_candidates": 25,
-  "active_candidates": 20,
-  "pending_intake": 5,
-  "recent_barriers": 12,
-  "recent_entries": 45,
-  "total_admin_notes": 78,
-  "recent_admin_notes": 15
-}
-```
-
-#### Candidate Dashboard
-- **GET** `/dashboard/candidate-stats/` (candidates only)
-- **Response**:
-```json
-{
-  "total_entries": 15,
-  "last_entry_date": "2024-01-15",
-  "avg_energy_level": 7.2,
-  "recent_barriers": 3,
-  "admin_notes_count": 5,
-  "mood_distribution": [
-    {"mood": "excellent", "count": 3},
-    {"mood": "good", "count": 8},
-    {"mood": "okay", "count": 4}
-  ],
-  "has_completed_intake": true
-}
-```
-
-## Data Models
-
-### User Model
-- `id`: Integer (auto)
-- `email`: Email (unique, must end with @capaciti.org.za)
-- `first_name`: String
-- `last_name`: String
-- `role`: Choice ('candidate', 'admin')
-- `has_completed_intake`: Boolean
-- `is_active`: Boolean
-- `is_staff`: Boolean
-- `date_joined`: DateTime
-- `created_at`: DateTime
-- `updated_at`: DateTime
-
-### UserProfile Model
-- Personal Information: date_of_birth, id_number, contact_number, address
-- Emergency Contact: emergency_contact, emergency_phone
-- Medical Information: diagnosis, medications, allergies, medical_notes, doctor_name, doctor_phone
-- Accommodations: accommodations, assistive_technology, learning_style, support_needs, communication_preferences
-
-### JournalEntry Model
-- `user`: ForeignKey to User
-- `date`: Date (unique per user per date)
-- `mood`: Choice (excellent, good, okay, difficult, very_difficult)
-- `energy_level`: Integer (1-10)
-- `activities`: Text
-- `challenges`: Text
-- `achievements`: Text
-- `notes`: Text
-- `barriers_faced`: Text
-- `barrier_count`: Integer
-
-### AdminNote Model
-- `candidate`: ForeignKey to User
-- `admin`: ForeignKey to User
-- `category`: Choice (progress, concern, achievement, medical, accommodation, general)
-- `title`: String
-- `content`: Text
-- `is_important`: Boolean
-
-## Error Responses
+## 🔍 Error Responses
 
 ### 400 Bad Request
 ```json
 {
-  "detail": "Error message",
-  "errors": {
-    "field_name": ["Field-specific error message"]
+  "error": "Validation failed",
+  "details": {
+    "email": ["This field is required."],
+    "password": ["Password must be at least 8 characters."]
   }
 }
 ```
@@ -314,7 +312,15 @@ Content-Type: application/json
 ### 401 Unauthorized
 ```json
 {
-  "detail": "Authentication credentials were not provided."
+  "detail": "Given token not valid for any token type",
+  "code": "token_not_valid",
+  "messages": [
+    {
+      "token_class": "AccessToken",
+      "token_type": "access",
+      "message": "Token is invalid or expired"
+    }
+  ]
 }
 ```
 
@@ -332,24 +338,156 @@ Content-Type: application/json
 }
 ```
 
-## Permissions
+---
 
-### Role-Based Access Control
-- **Candidates**: Can only access their own data
-- **Admins**: Can access all candidate data and perform administrative functions
+## 📱 Frontend Integration Examples
 
-### Endpoint Permissions
-- Authentication endpoints: Public (except logout, me)
-- User management: Admin only (except own profile)
-- Intake: Own data only
-- Journal: Own data only
-- Admin notes: Admin can create/read all, candidates can read their own
-- Dashboard: Role-specific stats
+### React/JavaScript Example
 
-## Environment Variables
+```javascript
+// API Client Setup
+const API_BASE_URL = 'https://your-railway-app.up.railway.app';
 
-See `.env.example` for required environment variables including:
-- Database configuration
-- Security settings
-- CORS settings
-- Debug mode settings
+class APIClient {
+  constructor() {
+    this.baseURL = API_BASE_URL;
+    this.token = localStorage.getItem('access_token');
+  }
+
+  async request(endpoint, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    };
+
+    if (this.token) {
+      config.headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(url, config);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  // Authentication
+  async login(email, password) {
+    const response = await this.request('/api/auth/login/', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+
+    this.token = response.access;
+    localStorage.setItem('access_token', response.access);
+    localStorage.setItem('refresh_token', response.refresh);
+
+    return response;
+  }
+
+  async logout() {
+    const refreshToken = localStorage.getItem('refresh_token');
+    await this.request('/api/auth/logout/', {
+      method: 'POST',
+      body: JSON.stringify({ refresh: refreshToken }),
+    });
+
+    this.token = null;
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+  }
+
+  // Journal Entries
+  async getJournalEntries() {
+    return this.request('/api/journal/');
+  }
+
+  async createJournalEntry(entry) {
+    return this.request('/api/journal/', {
+      method: 'POST',
+      body: JSON.stringify(entry),
+    });
+  }
+
+  // Dashboard
+  async getDashboard() {
+    return this.request('/api/dashboard/');
+  }
+
+  // User Profile
+  async getUserProfile() {
+    return this.request('/api/users/profile/');
+  }
+
+  async updateUserProfile(profileData) {
+    return this.request('/api/users/profile/', {
+      method: 'PUT',
+      body: JSON.stringify(profileData),
+    });
+  }
+}
+
+// Usage
+const api = new APIClient();
+
+// Login
+try {
+  const user = await api.login('student@capaciti.org.za', 'password');
+  console.log('Logged in:', user);
+} catch (error) {
+  console.error('Login failed:', error);
+}
+
+// Create journal entry
+try {
+  const entry = await api.createJournalEntry({
+    title: 'Learning Progress',
+    content: 'Made great progress with React hooks today',
+    mood: 'positive'
+  });
+  console.log('Entry created:', entry);
+} catch (error) {
+  console.error('Failed to create entry:', error);
+}
+```
+
+---
+
+## 🔧 Important Notes
+
+1. **Email Validation**: All user emails must end with `@capaciti.org.za`
+
+2. **Role-Based Access**:
+   - `candidate` - Regular students
+   - `admin` - Staff members with additional permissions
+
+3. **CORS**: Frontend should be configured to handle CORS properly
+
+4. **Token Refresh**: Implement automatic token refresh logic in your frontend
+
+5. **Error Handling**: Always handle API errors gracefully in your frontend
+
+6. **Rate Limiting**: Be mindful of API rate limits (if implemented)
+
+---
+
+## 🚀 Getting Started Checklist
+
+- [ ] Set up API client with base URL
+- [ ] Implement authentication flow (login/logout)
+- [ ] Add token storage and refresh logic
+- [ ] Create forms for user registration and login
+- [ ] Build journal entry creation/editing interface
+- [ ] Implement dashboard with user statistics
+- [ ] Add error handling and loading states
+- [ ] Test all endpoints with your Railway deployment URL
+
+---
+
+**Questions?** Once the 502 errors are resolved, you can test these endpoints directly!
