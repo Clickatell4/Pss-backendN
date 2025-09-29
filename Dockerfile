@@ -39,8 +39,8 @@ EXPOSE $PORT
 # Install curl for health checks
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=120s --retries=3 \
+# Health check - give more time for migrations and startup
+HEALTHCHECK --interval=30s --timeout=30s --start-period=180s --retries=5 \
   CMD curl -f http://localhost:$PORT/ || exit 1
 
 # Start command - simpler for debugging
