@@ -8,6 +8,9 @@ python manage.py migrate
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
+echo "Creating superuser from environment variables (if configured)..."
+python manage.py create_superuser_auto
+
 echo "Starting Gunicorn server..."
 exec gunicorn pss_backend.wsgi:application \
     --bind 0.0.0.0:$PORT \
