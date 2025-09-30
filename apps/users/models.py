@@ -33,6 +33,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = [
         ('candidate', 'Candidate'),
         ('admin', 'Admin'),
+        ('superuser', 'Superuser'),
     ]
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=150, blank=True)
