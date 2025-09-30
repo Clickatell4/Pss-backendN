@@ -11,6 +11,9 @@ python manage.py collectstatic --noinput
 echo "Creating superuser from environment variables (if configured)..."
 python manage.py create_superuser_auto
 
+echo "Fixing existing superuser roles..."
+python manage.py fix_superuser_role
+
 echo "Starting Gunicorn server..."
 exec gunicorn pss_backend.wsgi:application \
     --bind 0.0.0.0:$PORT \
