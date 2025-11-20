@@ -6,6 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from apps.users.serializers import UserSerializer
+from apps.users.permissions import IsSuperuser, IsAdminOrSuperuser
 
 User = get_user_model()
 
@@ -96,7 +97,9 @@ class RegisterView(APIView):
         password = request.data.get('password')
         first_name = request.data.get('first_name', '')
         last_name = request.data.get('last_name', '')
-        role = request.data.get('role', 'candidate')
+        # Security: Public registration only creates 'candidate' role accounts
+        # Admin/superuser accounts must be created through protected endpoints
+        role = 'candidate'
 
         # Validation
         if not email or not password:
@@ -129,16 +132,8 @@ class RegisterView(APIView):
                 'errors': {'email': ['A user with this email already exists.']}
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validate role
-        valid_roles = ['candidate', 'admin', 'superuser']
-        if role not in valid_roles:
-            return Response({
-                'error': 'Invalid role',
-                'errors': {'role': [f'Role must be one of: {", ".join(valid_roles)}']}
-            }, status=status.HTTP_400_BAD_REQUEST)
-
         try:
-            # Create user
+            # Create user with 'candidate' role only
             user = User.objects.create_user(
                 email=email,
                 password=password,
@@ -160,5 +155,141 @@ class RegisterView(APIView):
         except Exception as e:
             return Response({
                 'error': 'Failed to create user',
+                'details': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CreateAdminView(APIView):
+    """
+    Protected endpoint for creating admin accounts.
+    Only superusers can create admin accounts.
+    """
+    permission_classes = [IsSuperuser]
+
+    def post(self, request):
+        email = request.data.get('email')
+        password = request.data.get('password')
+        first_name = request.data.get('first_name', '')
+        last_name = request.data.get('last_name', '')
+
+        # Validation
+        if not email or not password:
+            return Response({
+                'error': 'Email and password are required',
+                'errors': {
+                    'email': ['This field is required.'] if not email else [],
+                    'password': ['This field is required.'] if not password else []
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate email format
+        if '@' not in email:
+            return Response({
+                'error': 'Invalid email format',
+                'errors': {'email': ['Enter a valid email address.']}
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate CAPACITI email domain
+        if not email.endswith('@capaciti.org.za'):
+            return Response({
+                'error': 'Only CAPACITI email addresses are allowed',
+                'errors': {'email': ['Email must be a CAPACITI email address (@capaciti.org.za)']}
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if user already exists
+        if User.objects.filter(email=email).exists():
+            return Response({
+                'error': 'User with this email already exists',
+                'errors': {'email': ['A user with this email already exists.']}
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Create admin user
+            user = User.objects.create_user(
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                role='admin'
+            )
+
+            user_data = UserSerializer(user).data
+
+            return Response({
+                'message': 'Admin user created successfully',
+                'user': user_data
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({
+                'error': 'Failed to create admin user',
+                'details': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CreateSuperuserView(APIView):
+    """
+    Protected endpoint for creating superuser accounts.
+    Only existing superusers can create new superuser accounts.
+    """
+    permission_classes = [IsSuperuser]
+
+    def post(self, request):
+        email = request.data.get('email')
+        password = request.data.get('password')
+        first_name = request.data.get('first_name', '')
+        last_name = request.data.get('last_name', '')
+
+        # Validation
+        if not email or not password:
+            return Response({
+                'error': 'Email and password are required',
+                'errors': {
+                    'email': ['This field is required.'] if not email else [],
+                    'password': ['This field is required.'] if not password else []
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate email format
+        if '@' not in email:
+            return Response({
+                'error': 'Invalid email format',
+                'errors': {'email': ['Enter a valid email address.']}
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate CAPACITI email domain
+        if not email.endswith('@capaciti.org.za'):
+            return Response({
+                'error': 'Only CAPACITI email addresses are allowed',
+                'errors': {'email': ['Email must be a CAPACITI email address (@capaciti.org.za)']}
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if user already exists
+        if User.objects.filter(email=email).exists():
+            return Response({
+                'error': 'User with this email already exists',
+                'errors': {'email': ['A user with this email already exists.']}
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Create superuser
+            user = User.objects.create_user(
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                role='superuser'
+            )
+
+            user_data = UserSerializer(user).data
+
+            return Response({
+                'message': 'Superuser created successfully',
+                'user': user_data
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({
+                'error': 'Failed to create superuser',
                 'details': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)

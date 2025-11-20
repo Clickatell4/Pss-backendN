@@ -1,6 +1,13 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
-from .views import LoginView, LogoutView, CurrentUserView, RegisterView
+from .views import (
+    LoginView,
+    LogoutView,
+    CurrentUserView,
+    RegisterView,
+    CreateAdminView,
+    CreateSuperuserView
+)
 
 urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
@@ -9,4 +16,7 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('user/', CurrentUserView.as_view(), name='current_user'),
     path('me/', CurrentUserView.as_view(), name='current_user_alias'),  # Alias for backwards compatibility
+    # Protected endpoints for creating privileged accounts
+    path('create-admin/', CreateAdminView.as_view(), name='create_admin'),
+    path('create-superuser/', CreateSuperuserView.as_view(), name='create_superuser'),
 ]
