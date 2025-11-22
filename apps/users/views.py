@@ -85,9 +85,9 @@ class CreateAdminView(APIView):
                 },
                 status=status.HTTP_201_CREATED
             )
-        except Exception as e:
+        except Exception:
             return Response(
-                {'error': str(e)},
+                {'error': 'Failed to create admin user'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -150,8 +150,8 @@ class CreateCandidateView(APIView):
                 },
                 status=status.HTTP_201_CREATED
             )
-        except Exception as e:
+        except Exception:
             return Response(
-                {'error': str(e)},
+                {'error': 'Failed to create candidate user'},
                 status=status.HTTP_400_BAD_REQUEST
             )
