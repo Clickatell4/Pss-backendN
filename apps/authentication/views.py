@@ -152,10 +152,9 @@ class RegisterView(APIView):
                 'refresh': str(refresh)
             }, status=status.HTTP_201_CREATED)
 
-        except Exception as e:
+        except Exception:
             return Response({
-                'error': 'Failed to create user',
-                'details': str(e)
+                'error': 'Failed to create user'
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -220,10 +219,9 @@ class CreateAdminView(APIView):
                 'user': user_data
             }, status=status.HTTP_201_CREATED)
 
-        except Exception as e:
+        except Exception:
             return Response({
-                'error': 'Failed to create admin user',
-                'details': str(e)
+                'error': 'Failed to create admin user'
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -288,8 +286,7 @@ class CreateSuperuserView(APIView):
                 'user': user_data
             }, status=status.HTTP_201_CREATED)
 
-        except Exception as e:
+        except Exception:
             return Response({
-                'error': 'Failed to create superuser',
-                'details': str(e)
+                'error': 'Failed to create superuser'
             }, status=status.HTTP_400_BAD_REQUEST)

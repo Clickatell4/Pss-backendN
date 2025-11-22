@@ -211,6 +211,8 @@ REST_FRAMEWORK = {
         'anon': '10/minute',
         'user': '1000/day',
     },
+    # Custom exception handler for secure error responses (OWASP A05:2021)
+    'EXCEPTION_HANDLER': 'pss_backend.exceptions.custom_exception_handler',
 }
 
 # Simple JWT configuration
