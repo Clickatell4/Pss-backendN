@@ -4,17 +4,78 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
 import os
+import sys
 from pathlib import Path
 from datetime import timedelta
-from decouple import config, Csv
+from decouple import config, Csv, UndefinedValueError
 
 # Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Security settings
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-development-key-only-for-testing')
-DEBUG = config('DEBUG', cast=bool, default=True)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv(), default='*')
+# =============================================================================
+# SECRET_KEY Configuration (CRITICAL SECURITY)
+# =============================================================================
+# SECRET_KEY is MANDATORY - Django will not start without it.
+# Generate with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+
+# List of known insecure/default keys that must be rejected
+INSECURE_SECRET_KEYS = [
+    'django-insecure-development-key-only-for-testing',
+    'your-secret-key-here',
+    'change-me',
+    'secret',
+    'django-insecure',
+]
+
+try:
+    SECRET_KEY = config('SECRET_KEY')
+except UndefinedValueError:
+    raise RuntimeError(
+        "\n\n"
+        "=" * 70 + "\n"
+        "CRITICAL ERROR: SECRET_KEY is not set!\n"
+        "=" * 70 + "\n\n"
+        "Django requires a SECRET_KEY to run securely.\n\n"
+        "To fix this:\n"
+        "1. Generate a key: python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\"\n"
+        "2. Add to your .env file: SECRET_KEY=your-generated-key\n\n"
+        "WARNING: Never commit your SECRET_KEY to version control!\n"
+        "=" * 70 + "\n"
+    )
+
+# Validate SECRET_KEY
+def _validate_secret_key(key):
+    """Validate that SECRET_KEY meets security requirements."""
+    errors = []
+
+    # Check minimum length (Django recommends at least 50 characters)
+    if len(key) < 50:
+        errors.append(f"SECRET_KEY is too short ({len(key)} chars). Must be at least 50 characters.")
+
+    # Check against known insecure keys
+    if key.lower() in [k.lower() for k in INSECURE_SECRET_KEYS] or 'insecure' in key.lower():
+        errors.append("SECRET_KEY contains a known insecure/default value.")
+
+    if errors:
+        raise RuntimeError(
+            "\n\n"
+            "=" * 70 + "\n"
+            "CRITICAL ERROR: SECRET_KEY validation failed!\n"
+            "=" * 70 + "\n\n"
+            + "\n".join(f"  - {e}" for e in errors) + "\n\n"
+            "To fix this:\n"
+            "1. Generate a new key: python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\"\n"
+            "2. Update your .env file with the new key\n\n"
+            "=" * 70 + "\n"
+        )
+
+_validate_secret_key(SECRET_KEY)
+
+# =============================================================================
+# Core Django Settings
+# =============================================================================
+DEBUG = config('DEBUG', cast=bool, default=False)
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv(), default='localhost,127.0.0.1')
 
 # Field-level encryption key for PII data (POPIA compliance)
 # IMPORTANT: Generate a unique key for production using: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -154,6 +215,8 @@ REST_FRAMEWORK = {
         'anon': '10/minute',
         'user': '1000/day',
     },
+    # Custom exception handler for secure error responses (OWASP A05:2021)
+    'EXCEPTION_HANDLER': 'pss_backend.exceptions.custom_exception_handler',
 }
 
 # Simple JWT configuration
@@ -174,12 +237,17 @@ CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', cast=bool, default=Fal
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', cast=bool, default=False)
-CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', cast=bool, default=False)
 SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', cast=bool, default=False)
 SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', cast=int, default=0)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', cast=bool, default=False)
 SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', cast=bool, default=False)
 X_FRAME_OPTIONS = 'DENY'
+
+# CSRF Protection (OWASP A01:2021 - Broken Access Control)
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', cast=bool, default=False)
+CSRF_COOKIE_HTTPONLY = True  # Prevent JavaScript access to CSRF cookie
+CSRF_COOKIE_SAMESITE = 'Lax'  # Protect against CSRF while allowing normal navigation
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv(), default='http://localhost:5173,http://127.0.0.1:5173')
 
 # Additional security headers
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
