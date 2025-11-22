@@ -77,6 +77,10 @@ _validate_secret_key(SECRET_KEY)
 DEBUG = config('DEBUG', cast=bool, default=False)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv(), default='localhost,127.0.0.1')
 
+# Field-level encryption key for PII data (POPIA compliance)
+# IMPORTANT: Generate a unique key for production using: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='dev-only-key-replace-in-production-32bytes!')
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',  # Ensure this is first for admin static files

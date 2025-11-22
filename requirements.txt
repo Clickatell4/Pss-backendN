@@ -9,3 +9,4 @@ pillow==10.0.1
 gunicorn==21.2.0
 python-dotenv==1.0.0
 dj-database-url==2.1.0
+django-encrypted-model-fields==0.6.5

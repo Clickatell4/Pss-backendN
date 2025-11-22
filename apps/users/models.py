@@ -2,6 +2,7 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseU
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from encrypted_model_fields.fields import EncryptedCharField, EncryptedTextField
 
 class UserManager(BaseUserManager):
     use_in_migrations = True
@@ -64,24 +65,46 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.email
 
 class UserProfile(models.Model):
+    """
+    User profile containing sensitive PII data.
+
+    POPIA Compliance: The following fields are encrypted at rest:
+    - id_number (SA ID contains DOB, gender)
+    - Medical information (diagnosis, medications, allergies, medical_notes)
+    - Doctor information (doctor_name, doctor_phone)
+    - Emergency contacts (emergency_contact, emergency_phone)
+    """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     date_of_birth = models.DateField(null=True, blank=True)
-    id_number = models.CharField(max_length=13, null=True, blank=True)
+
+    # Encrypted PII fields - SA ID number
+    id_number = EncryptedCharField(max_length=255, null=True, blank=True)
+
+    # Contact information
     contact_number = models.CharField(max_length=15, null=True, blank=True)
     address = models.TextField(null=True, blank=True)
-    emergency_contact = models.CharField(max_length=100, null=True, blank=True)
-    emergency_phone = models.CharField(max_length=15, null=True, blank=True)
-    diagnosis = models.TextField(null=True, blank=True)
-    medications = models.TextField(null=True, blank=True)
-    allergies = models.TextField(null=True, blank=True)
-    medical_notes = models.TextField(null=True, blank=True)
-    doctor_name = models.CharField(max_length=100, null=True, blank=True)
-    doctor_phone = models.CharField(max_length=15, null=True, blank=True)
+
+    # Encrypted emergency contact information
+    emergency_contact = EncryptedCharField(max_length=255, null=True, blank=True)
+    emergency_phone = EncryptedCharField(max_length=255, null=True, blank=True)
+
+    # Encrypted medical information (highly sensitive)
+    diagnosis = EncryptedTextField(null=True, blank=True)
+    medications = EncryptedTextField(null=True, blank=True)
+    allergies = EncryptedTextField(null=True, blank=True)
+    medical_notes = EncryptedTextField(null=True, blank=True)
+
+    # Encrypted doctor information
+    doctor_name = EncryptedCharField(max_length=255, null=True, blank=True)
+    doctor_phone = EncryptedCharField(max_length=255, null=True, blank=True)
+
+    # Non-sensitive accessibility preferences (not encrypted)
     accommodations = models.TextField(null=True, blank=True)
     assistive_technology = models.TextField(null=True, blank=True)
     learning_style = models.CharField(max_length=100, null=True, blank=True)
     support_needs = models.TextField(null=True, blank=True)
     communication_preferences = models.TextField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
