@@ -25,9 +25,9 @@ class IntakeSubmissionView(APIView):
                 'detail': 'Intake completed successfully',
                 'profile': serializer.data
             }, status=status.HTTP_200_OK)
-        except Exception as e:
+        except Exception:
             return Response(
-                {'detail': f'Error completing intake: {str(e)}'},
+                {'detail': 'Error completing intake. Please try again.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

@@ -4,17 +4,78 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
 import os
+import sys
 from pathlib import Path
 from datetime import timedelta
-from decouple import config, Csv
+from decouple import config, Csv, UndefinedValueError
 
 # Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Security settings
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-development-key-only-for-testing')
-DEBUG = config('DEBUG', cast=bool, default=True)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv(), default='*')
+# =============================================================================
+# SECRET_KEY Configuration (CRITICAL SECURITY)
+# =============================================================================
+# SECRET_KEY is MANDATORY - Django will not start without it.
+# Generate with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+
+# List of known insecure/default keys that must be rejected
+INSECURE_SECRET_KEYS = [
+    'django-insecure-development-key-only-for-testing',
+    'your-secret-key-here',
+    'change-me',
+    'secret',
+    'django-insecure',
+]
+
+try:
+    SECRET_KEY = config('SECRET_KEY')
+except UndefinedValueError:
+    raise RuntimeError(
+        "\n\n"
+        "=" * 70 + "\n"
+        "CRITICAL ERROR: SECRET_KEY is not set!\n"
+        "=" * 70 + "\n\n"
+        "Django requires a SECRET_KEY to run securely.\n\n"
+        "To fix this:\n"
+        "1. Generate a key: python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\"\n"
+        "2. Add to your .env file: SECRET_KEY=your-generated-key\n\n"
+        "WARNING: Never commit your SECRET_KEY to version control!\n"
+        "=" * 70 + "\n"
+    )
+
+# Validate SECRET_KEY
+def _validate_secret_key(key):
+    """Validate that SECRET_KEY meets security requirements."""
+    errors = []
+
+    # Check minimum length (Django recommends at least 50 characters)
+    if len(key) < 50:
+        errors.append(f"SECRET_KEY is too short ({len(key)} chars). Must be at least 50 characters.")
+
+    # Check against known insecure keys
+    if key.lower() in [k.lower() for k in INSECURE_SECRET_KEYS] or 'insecure' in key.lower():
+        errors.append("SECRET_KEY contains a known insecure/default value.")
+
+    if errors:
+        raise RuntimeError(
+            "\n\n"
+            "=" * 70 + "\n"
+            "CRITICAL ERROR: SECRET_KEY validation failed!\n"
+            "=" * 70 + "\n\n"
+            + "\n".join(f"  - {e}" for e in errors) + "\n\n"
+            "To fix this:\n"
+            "1. Generate a new key: python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\"\n"
+            "2. Update your .env file with the new key\n\n"
+            "=" * 70 + "\n"
+        )
+
+_validate_secret_key(SECRET_KEY)
+
+# =============================================================================
+# Core Django Settings
+# =============================================================================
+DEBUG = config('DEBUG', cast=bool, default=False)
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv(), default='localhost,127.0.0.1')
 
 # Application definition
 INSTALLED_APPS = [
@@ -150,6 +211,8 @@ REST_FRAMEWORK = {
         'anon': '10/minute',
         'user': '1000/day',
     },
+    # Custom exception handler for secure error responses (OWASP A05:2021)
+    'EXCEPTION_HANDLER': 'pss_backend.exceptions.custom_exception_handler',
 }
 
 # Simple JWT configuration
