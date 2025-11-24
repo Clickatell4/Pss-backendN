@@ -270,3 +270,43 @@ postgres_data/
 
 # Application specific
 postman_collection.json
+
+# =============================================================================
+# Secrets Management (SCRUM-26)
+# =============================================================================
+# Environment files with secrets
+.env
+.env.*
+!.env.example
+.env.production
+.env.staging
+.env.development
+
+# Encrypted secrets (git-secret)
+# Note: .secret files ARE tracked as they contain encrypted data
+# But plain-text versions must never be committed
+
+# Secret keys and credentials
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+*-credentials.json
+secrets.yaml
+secrets.yml
+secrets.json
+
+# Backup files that may contain secrets
+*.env.bak
+*.env.backup
+
+# IDE secret storage
+.idea/secrets/
+.vscode/secrets/
+
+# Docker secrets
+docker-secrets/
+.docker-secrets
