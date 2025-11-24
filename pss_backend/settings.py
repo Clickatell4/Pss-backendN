@@ -5,9 +5,16 @@ AUTHENTICATION_BACKENDS = [
 ]
 import os
 import sys
+import logging
 from pathlib import Path
 from datetime import timedelta
 from decouple import config, Csv, UndefinedValueError
+
+# =============================================================================
+# Secrets Access Logging (SCRUM-26)
+# =============================================================================
+# Log when secrets are loaded at startup for audit trail
+_secrets_logger = logging.getLogger('django.security.secrets')
 
 # Build paths inside the project
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -71,6 +78,12 @@ def _validate_secret_key(key):
 
 _validate_secret_key(SECRET_KEY)
 
+# Log successful SECRET_KEY load (without exposing the key)
+_secrets_logger.info(
+    "SECRET_KEY loaded successfully (length: %d, first 4 chars: %s...)",
+    len(SECRET_KEY), SECRET_KEY[:4]
+)
+
 # =============================================================================
 # Core Django Settings
 # =============================================================================
@@ -80,6 +93,17 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv(), default='localhost,127.0.0.1
 # Field-level encryption key for PII data (POPIA compliance)
 # IMPORTANT: Generate a unique key for production using: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='dev-only-key-replace-in-production-32bytes!')
+
+# Log encryption key status (SCRUM-26: secrets access logging)
+if FIELD_ENCRYPTION_KEY == 'dev-only-key-replace-in-production-32bytes!':
+    _secrets_logger.warning(
+        "FIELD_ENCRYPTION_KEY is using default development value - NOT SAFE FOR PRODUCTION"
+    )
+else:
+    _secrets_logger.info(
+        "FIELD_ENCRYPTION_KEY loaded successfully (length: %d)",
+        len(FIELD_ENCRYPTION_KEY)
+    )
 
 # Application definition
 INSTALLED_APPS = [
@@ -294,6 +318,12 @@ LOGGING = {
         },
         'django.security': {
             'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Secrets access logging (SCRUM-26)
+        'django.security.secrets': {
+            'handlers': ['console', 'file'],
             'level': 'INFO',
             'propagate': False,
         },
