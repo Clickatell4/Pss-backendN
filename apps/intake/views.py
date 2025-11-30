@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from apps.users.models import UserProfile
 from apps.users.serializers import UserProfileSerializer
 from rest_framework import status
+from django.core.exceptions import ValidationError
 from .utils import complete_intake
 
 class IntakeSubmissionView(APIView):
@@ -18,14 +19,31 @@ class IntakeSubmissionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Validate intake data using UserProfileSerializer
+        serializer = UserProfileSerializer(data=intake_data, partial=True)
+
         try:
-            profile = complete_intake(request.user, intake_data)
-            serializer = UserProfileSerializer(profile)
+            if not serializer.is_valid():
+                return Response({
+                    'detail': 'Invalid intake data',
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Complete intake with validated data
+            profile = complete_intake(request.user, serializer.validated_data)
+            response_serializer = UserProfileSerializer(profile)
+
             return Response({
                 'detail': 'Intake completed successfully',
-                'profile': serializer.data
+                'profile': response_serializer.data
             }, status=status.HTTP_200_OK)
-        except Exception:
+
+        except ValidationError as e:
+            return Response({
+                'detail': 'Validation error',
+                'errors': {'validation': str(e)}
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
             return Response(
                 {'detail': 'Error completing intake. Please try again.'},
                 status=status.HTTP_400_BAD_REQUEST

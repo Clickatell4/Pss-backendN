@@ -138,6 +138,8 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'pss_backend.middleware.RequestValidationMiddleware',  # SCRUM-7: Request validation
+    'pss_backend.middleware.JSONValidationMiddleware',  # SCRUM-7: JSON validation
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
