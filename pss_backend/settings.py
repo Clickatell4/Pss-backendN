@@ -301,11 +301,55 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# --------------------------------------------------------
-# CORS
-# --------------------------------------------------------
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', cast=Csv(), default='http://localhost:5173')
+# =============================================================================
+# CORS CONFIGURATION (SCRUM-41 — Harden Production CORS)
+# =============================================================================
+
+# ---- Allowed production origins (STRICT) ----
+PRODUCTION_CORS_ORIGINS = [
+    "https://pss-frontend-ebon.vercel.app",
+]
+
+# ---- Allowed development origins ----
+DEVELOPMENT_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+# ---- Switch based on DEBUG mode ----
+if DEBUG:
+    CORS_ALLOWED_ORIGINS = DEVELOPMENT_CORS_ORIGINS
+else:
+    CORS_ALLOWED_ORIGINS = PRODUCTION_CORS_ORIGINS
+
+# ---- Do NOT ever allow wildcard origins ----
+CORS_ALLOW_ALL_ORIGINS = False
+
+# ---- Allowed HTTP methods ----
+CORS_ALLOWED_METHODS = [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+]
+
+# ---- Allowed headers ----
+CORS_ALLOWED_HEADERS = [
+    "Authorization",
+    "Content-Type",
+    "Accept",
+    "Origin",
+    "User-Agent",
+]
+
+# ---- Whether cookies/JWT tokens can be sent ----
 CORS_ALLOW_CREDENTIALS = True
+
+# ---- Cache preflight (OPTIONS) responses ----
+CORS_MAX_AGE = 86400  # 1 day
+# =============================================================================
 
 # --------------------------------------------------------
 # SECURITY HEADERS
