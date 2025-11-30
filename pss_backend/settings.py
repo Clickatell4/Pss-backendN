@@ -9,27 +9,18 @@ import sys
 import logging
 from pathlib import Path
 from datetime import timedelta
-<<<<<<< HEAD
-from decouple import config, Csv
-import dj_database_url
-=======
 from decouple import config, Csv, UndefinedValueError
+import dj_database_url
 
 # =============================================================================
 # Secrets Access Logging (SCRUM-26)
 # =============================================================================
 # Log when secrets are loaded at startup for audit trail
 _secrets_logger = logging.getLogger('django.security.secrets')
->>>>>>> d7b02cf2b7903f35c4283c7b52b86f3fc94e64e3
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-<<<<<<< HEAD
-# --------------------------------------------------------
-# SECURITY: STRICT ENV VALIDATION FOR PRODUCTION
-# --------------------------------------------------------
-=======
 # =============================================================================
 # SECRET_KEY Configuration (CRITICAL SECURITY)
 # =============================================================================
@@ -115,30 +106,6 @@ else:
         "FIELD_ENCRYPTION_KEY loaded successfully (length: %d)",
         len(FIELD_ENCRYPTION_KEY)
     )
->>>>>>> d7b02cf2b7903f35c4283c7b52b86f3fc94e64e3
-
-# Default DEBUG is ALWAYS False (secure)
-DEBUG = config("DEBUG", cast=bool, default=False)
-
-# SECRET KEY must be provided in production
-SECRET_KEY = config(
-    "SECRET_KEY",
-    default="django-insecure-development-key-only-for-testing"
-)
-
-# ALLOWED_HOSTS must be EXPLICITLY declared (no wildcard allowed)
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=Csv(), default=None)
-
-if not DEBUG:
-    # In production, ALLOWED_HOSTS cannot be empty or wildcard
-    if not ALLOWED_HOSTS:
-        raise ValueError("❌ ALLOWED_HOSTS must be set in production!")
-    if "*" in ALLOWED_HOSTS:
-        raise ValueError("❌ ALLOWED_HOSTS cannot contain '*'. This is insecure.")
-
-else:
-    # Local development convenience
-    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 # --------------------------------------------------------
 # APPLICATIONS
@@ -271,11 +238,6 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
-<<<<<<< HEAD
-    'DEFAULT_FILTER_BACKENDS': (
-        'django_filters.rest_framework.DjangoFilterBackend',
-    ),
-=======
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
@@ -287,7 +249,6 @@ REST_FRAMEWORK = {
     },
     # Custom exception handler for secure error responses (OWASP A05:2021)
     'EXCEPTION_HANDLER': 'pss_backend.exceptions.custom_exception_handler',
->>>>>>> d7b02cf2b7903f35c4283c7b52b86f3fc94e64e3
 }
 
 # --------------------------------------------------------
@@ -356,15 +317,6 @@ CORS_MAX_AGE = 86400  # 1 day
 # --------------------------------------------------------
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-<<<<<<< HEAD
-SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", cast=bool, default=False)
-
-# --------------------------------------------------------
-# LOGGING
-# --------------------------------------------------------
-LOG_DIR = BASE_DIR / 'logs'
-LOG_DIR.mkdir(exist_ok=True)
-=======
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', cast=bool, default=False)
 SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', cast=bool, default=False)
 SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', cast=int, default=0)
@@ -381,7 +333,12 @@ CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv(), default='http:
 # Additional security headers
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
->>>>>>> d7b02cf2b7903f35c4283c7b52b86f3fc94e64e3
+
+# --------------------------------------------------------
+# LOGGING
+# --------------------------------------------------------
+LOG_DIR = BASE_DIR / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
 
 LOGGING = {
     'version': 1,
@@ -406,10 +363,6 @@ LOGGING = {
             'handlers': ['console', 'file'],
             'level': 'INFO',
             'propagate': False,
-<<<<<<< HEAD
-        }
-    }
-=======
         },
         'django.security': {
             'handlers': ['file'],
@@ -423,7 +376,6 @@ LOGGING = {
             'propagate': False,
         },
     },
->>>>>>> d7b02cf2b7903f35c4283c7b52b86f3fc94e64e3
 }
 
 # --------------------------------------------------------
