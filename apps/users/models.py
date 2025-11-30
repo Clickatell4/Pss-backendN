@@ -119,3 +119,14 @@ class UserProfile(models.Model):
 # Tracks all changes to User and UserProfile for compliance and security monitoring
 auditlog.register(User, exclude_fields=['password', 'last_login'])  # Don't log sensitive password data
 auditlog.register(UserProfile)  # Track all PII changes
+
+# =============================================================================
+# SCRUM-11: Import POPIA compliance models
+# =============================================================================
+# Import after User model is defined to avoid circular imports
+from .popia_models import (  # noqa: E402, F401
+    PrivacyPolicyVersion,
+    UserConsent,
+    DataDeletionRequest,
+    DataExportRequest
+)

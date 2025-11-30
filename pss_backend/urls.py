@@ -13,6 +13,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('apps.authentication.urls')),
     path('api/users/', include('apps.users.urls')),
+    path('api/popia/', include('apps.users.popia_urls')),  # SCRUM-11: POPIA/GDPR compliance endpoints
     path('api/intake/', include('apps.intake.urls')),
     path('api/journal/', include('apps.journal.urls')),
     path('api/admin-notes/', include('apps.admin_notes.urls')),
