@@ -3,6 +3,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from encrypted_model_fields.fields import EncryptedCharField, EncryptedTextField
+from auditlog.registry import auditlog
 
 class UserManager(BaseUserManager):
     use_in_migrations = True
@@ -110,3 +111,11 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"profile: {self.user.email}"
+
+
+# =============================================================================
+# SCRUM-8: Register models for audit logging (POPIA compliance)
+# =============================================================================
+# Tracks all changes to User and UserProfile for compliance and security monitoring
+auditlog.register(User, exclude_fields=['password', 'last_login'])  # Don't log sensitive password data
+auditlog.register(UserProfile)  # Track all PII changes
