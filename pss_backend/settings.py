@@ -1,7 +1,8 @@
-# Custom authentication backend for email login
+# SCRUM-10: Authentication backends with axes for rate limiting
 AUTHENTICATION_BACKENDS = [
-    'apps.users.backends.EmailBackend',
-    'django.contrib.auth.backends.ModelBackend',
+    'axes.backends.AxesStandaloneBackend',  # Rate limiting - must be first
+    'apps.users.backends.EmailBackend',  # Custom email login
+    'django.contrib.auth.backends.ModelBackend',  # Default backend
 ]
 
 import os
@@ -123,6 +124,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
+    'axes',  # SCRUM-10: Rate limiting and brute force protection
 
     # Local apps
     'apps.authentication',
@@ -142,6 +144,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'axes.middleware.AxesMiddleware',  # SCRUM-10: Must be after AuthenticationMiddleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -382,3 +385,46 @@ LOGGING = {
 # DEFAULT AUTO FIELD
 # --------------------------------------------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# =============================================================================
+# RATE LIMITING & BRUTE FORCE PROTECTION (SCRUM-10)
+# =============================================================================
+# Django Axes - Authentication rate limiting and brute force protection
+# Prevents credential stuffing and brute force attacks on login endpoints
+
+# Lock out after 5 failed login attempts
+AXES_FAILURE_LIMIT = 5
+
+# Lockout duration: 15 minutes
+AXES_COOLOFF_TIME = timedelta(minutes=15)
+
+# Track by IP address and username combination
+AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True
+
+# Also track IP-only failures (not just username+IP)
+AXES_ONLY_USER_FAILURES = False
+
+# Reset failed attempts on successful login
+AXES_RESET_ON_SUCCESS = True
+
+# Enable axes globally
+AXES_ENABLED = True
+
+# Log lockout attempts for security monitoring
+AXES_VERBOSE = True
+
+# Store in database (not cache) for persistence
+AXES_HANDLER = 'axes.handlers.database.AxesDatabaseHandler'
+
+# IP resolution order when behind proxy (e.g., Nginx)
+AXES_META_PRECEDENCE_ORDER = [
+    'HTTP_X_FORWARDED_FOR',
+    'REMOTE_ADDR',
+]
+
+# Whitelist trusted IPs (none by default - add if needed)
+AXES_NEVER_LOCKOUT_WHITELIST = []
+
+# Use custom lockout response (will be JSON for API)
+AXES_LOCKOUT_TEMPLATE = None  # Returns 403 JSON response
+# =============================================================================

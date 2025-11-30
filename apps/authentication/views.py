@@ -7,12 +7,14 @@ from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, Bl
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from apps.users.serializers import UserSerializer
 from apps.users.permissions import IsSuperuser, IsAdminOrSuperuser
+from pss_backend.throttles import AuthRateThrottle, RegisterRateThrottle
 
 User = get_user_model()
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
-    
+    throttle_classes = [AuthRateThrottle]  # SCRUM-10: Rate limit login attempts
+
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
@@ -91,6 +93,7 @@ class CurrentUserView(APIView):
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [RegisterRateThrottle]  # SCRUM-10: Rate limit registration attempts
 
     def post(self, request):
         email = request.data.get('email')
