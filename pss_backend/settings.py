@@ -407,3 +407,38 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # AUDITLOG_EXCLUDE_TRACKING_MODELS = ['SomeModel']
 
 # =============================================================================
+
+# =============================================================================
+# EMAIL CONFIGURATION (Required for notifications)
+# =============================================================================
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+
+# Email backend configuration
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', cast=int, default=587)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool, default=True)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@capaciti.org.za')
+
+# =============================================================================
+# INACTIVE ACCOUNT RETENTION (SCRUM-119 - POPIA Section 14)
+# =============================================================================
+# Automatic deletion of inactive accounts to comply with data minimization
+
+# Inactivity threshold: Delete accounts after N years of no login
+INACTIVE_ACCOUNT_THRESHOLD_YEARS = config('INACTIVE_ACCOUNT_THRESHOLD_YEARS', cast=int, default=2)
+
+# Grace period: Days between first warning and deletion
+INACTIVE_ACCOUNT_GRACE_PERIOD_DAYS = config('INACTIVE_ACCOUNT_GRACE_PERIOD_DAYS', cast=int, default=30)
+
+# Roles exempt from automatic deletion (admin accounts never auto-deleted)
+INACTIVE_ACCOUNT_EXCLUDE_ROLES = ['admin', 'superuser']
+
+_secrets_logger.info(
+    "Inactive account policy: %d years threshold, %d days grace period",
+    INACTIVE_ACCOUNT_THRESHOLD_YEARS,
+    INACTIVE_ACCOUNT_GRACE_PERIOD_DAYS
+)
+# =============================================================================
