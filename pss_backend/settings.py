@@ -487,3 +487,41 @@ AXES_NEVER_LOCKOUT_WHITELIST = []
 # Use custom lockout response (will be JSON for API)
 AXES_LOCKOUT_TEMPLATE = None  # Returns 403 JSON response
 # =============================================================================
+
+# =============================================================================
+# EMAIL CONFIGURATION (SCRUM-117 - Password Reset)
+# =============================================================================
+# Email backend configuration for sending password reset emails
+# Use console backend in development, SMTP in production
+
+# Frontend URL for password reset links
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+
+# Email backend (console for dev, SMTP for production)
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend'
+)
+
+# SMTP Configuration (only used if EMAIL_BACKEND is set to SMTP)
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', cast=int, default=587)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool, default=True)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@capaciti.org.za')
+
+# Log email configuration (without exposing credentials)
+_secrets_logger.info(
+    "Email backend: %s (SMTP host: %s, port: %s, from: %s)",
+    EMAIL_BACKEND.split('.')[-1],
+    EMAIL_HOST if EMAIL_BACKEND != 'django.core.mail.backends.console.EmailBackend' else 'N/A',
+    EMAIL_PORT if EMAIL_BACKEND != 'django.core.mail.backends.console.EmailBackend' else 'N/A',
+    DEFAULT_FROM_EMAIL
+)
+
+if EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
+    _secrets_logger.warning(
+        "Using console email backend - emails will be printed to console (development only)"
+    )
+# =============================================================================

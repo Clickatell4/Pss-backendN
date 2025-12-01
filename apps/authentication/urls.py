@@ -6,7 +6,10 @@ from .views import (
     CurrentUserView,
     RegisterView,
     CreateAdminView,
-    CreateSuperuserView
+    CreateSuperuserView,
+    PasswordResetRequestView,
+    PasswordResetValidateTokenView,
+    PasswordResetConfirmView,
 )
 
 urlpatterns = [
@@ -19,4 +22,8 @@ urlpatterns = [
     # Protected endpoints for creating privileged accounts
     path('create-admin/', CreateAdminView.as_view(), name='create_admin'),
     path('create-superuser/', CreateSuperuserView.as_view(), name='create_superuser'),
+    # Password reset endpoints (SCRUM-117)
+    path('password-reset/request/', PasswordResetRequestView.as_view(), name='password_reset_request'),
+    path('password-reset/validate-token/', PasswordResetValidateTokenView.as_view(), name='password_reset_validate'),
+    path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
 ]
