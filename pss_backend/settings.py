@@ -1,8 +1,8 @@
-# SCRUM-10: Authentication backends with axes for rate limiting
+# Custom authentication backend for email login
 AUTHENTICATION_BACKENDS = [
-    'axes.backends.AxesStandaloneBackend',  # Rate limiting - must be first
-    'apps.users.backends.EmailBackend',  # Custom email login
-    'django.contrib.auth.backends.ModelBackend',  # Default backend
+    'axes.backends.AxesStandaloneBackend',  # SCRUM-10: Must be first for rate limiting
+    'apps.users.backends.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
 ]
 
 import os
@@ -124,6 +124,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
+    'auditlog',  # SCRUM-8: Audit logging for compliance
     'axes',  # SCRUM-10: Rate limiting and brute force protection
 
     # Local apps
@@ -140,11 +141,14 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'pss_backend.middleware.RequestValidationMiddleware',  # SCRUM-7: Request validation
+    'pss_backend.middleware.JSONValidationMiddleware',  # SCRUM-7: JSON validation
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'axes.middleware.AxesMiddleware',  # SCRUM-10: Must be after AuthenticationMiddleware
+    'auditlog.middleware.AuditlogMiddleware',  # SCRUM-8: Track who made changes
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -378,6 +382,12 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        # Authentication event logging (SCRUM-8)
+        'django.security.auth': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 
@@ -385,6 +395,21 @@ LOGGING = {
 # DEFAULT AUTO FIELD
 # --------------------------------------------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# =============================================================================
+# AUDIT LOGGING (SCRUM-8 - POPIA Compliance)
+# =============================================================================
+# Django Auditlog - Tracks all changes to sensitive data
+# Required for POPIA compliance and security monitoring
+
+# Log retention: 2 years minimum for POPIA compliance
+# Note: Implement cleanup script for logs older than 2 years
+# AUDITLOG_INCLUDE_TRACKING_MODELS = True  # Track all registered models
+
+# Disable audit logging for select models (if needed)
+# AUDITLOG_EXCLUDE_TRACKING_MODELS = ['SomeModel']
+
+# =============================================================================
 
 # =============================================================================
 # RATE LIMITING & BRUTE FORCE PROTECTION (SCRUM-10)

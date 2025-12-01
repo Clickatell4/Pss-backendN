@@ -8,6 +8,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from apps.users.serializers import UserSerializer
 from apps.users.permissions import IsSuperuser, IsAdminOrSuperuser
 from pss_backend.throttles import AuthRateThrottle, RegisterRateThrottle
+from pss_backend.validators import sanitize_text, validate_email_domain, validate_text_length
+from django.core.exceptions import ValidationError
 
 User = get_user_model()
 
@@ -28,18 +30,23 @@ class LoginView(APIView):
                 }
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validate email format
-        if '@' not in email:
+        # Sanitize and validate email
+        try:
+            email = sanitize_text(email, max_length=255)
+            email = validate_email_domain(email, allowed_domains=['capaciti.org.za'])
+        except ValidationError as e:
             return Response({
-                'detail': 'Invalid email format',
-                'errors': {'email': ['Enter a valid email address.']}
+                'detail': 'Invalid email',
+                'errors': {'email': [str(e)]}
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validate CAPACITI email domain
-        if not email.endswith('@capaciti.org.za'):
+        # Validate password length (prevent DoS with huge passwords)
+        try:
+            validate_text_length(password, max_length=128, field_name='Password')
+        except ValidationError as e:
             return Response({
-                'detail': 'Only CAPACITI email addresses are allowed',
-                'errors': {'email': ['Email must be a CAPACITI email address']}
+                'detail': 'Invalid password',
+                'errors': {'password': [str(e)]}
             }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -114,18 +121,35 @@ class RegisterView(APIView):
                 }
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validate email format
-        if '@' not in email:
+        # Sanitize and validate email
+        try:
+            email = sanitize_text(email, max_length=255)
+            email = validate_email_domain(email, allowed_domains=['capaciti.org.za'])
+        except ValidationError as e:
             return Response({
-                'error': 'Invalid email format',
-                'errors': {'email': ['Enter a valid email address.']}
+                'error': 'Invalid email',
+                'errors': {'email': [str(e)]}
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validate CAPACITI email domain
-        if not email.endswith('@capaciti.org.za'):
+        # Validate password length
+        try:
+            validate_text_length(password, min_length=8, max_length=128, field_name='Password')
+        except ValidationError as e:
             return Response({
-                'error': 'Only CAPACITI email addresses are allowed',
-                'errors': {'email': ['Email must be a CAPACITI email address (@capaciti.org.za)']}
+                'error': 'Invalid password',
+                'errors': {'password': [str(e)]}
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Sanitize name fields
+        try:
+            if first_name:
+                first_name = sanitize_text(first_name, max_length=150)
+            if last_name:
+                last_name = sanitize_text(last_name, max_length=150)
+        except ValidationError as e:
+            return Response({
+                'error': 'Invalid name',
+                'errors': {'name': [str(e)]}
             }, status=status.HTTP_400_BAD_REQUEST)
 
         # Check if user already exists
