@@ -1,5 +1,6 @@
 # Custom authentication backend for email login
 AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',  # SCRUM-10: Must be first for rate limiting
     'apps.users.backends.EmailBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
@@ -124,6 +125,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     'auditlog',  # SCRUM-8: Audit logging for compliance
+    'axes',  # SCRUM-10: Rate limiting and brute force protection
 
     # Local apps
     'apps.authentication',
@@ -145,6 +147,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'axes.middleware.AxesMiddleware',  # SCRUM-10: Must be after AuthenticationMiddleware
     'auditlog.middleware.AuditlogMiddleware',  # SCRUM-8: Track who made changes
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -265,6 +268,40 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+# =============================================================================
+# CAPTCHA CONFIGURATION (SCRUM-120 - Enhanced Brute Force Protection)
+# =============================================================================
+# Integrates with rate limiting (SCRUM-10) to add human verification layer
+
+# Enable/disable CAPTCHA (useful for testing)
+CAPTCHA_ENABLED = config('CAPTCHA_ENABLED', cast=bool, default=True)
+
+# CAPTCHA provider ('recaptcha', 'hcaptcha', 'turnstile')
+CAPTCHA_PROVIDER = config('CAPTCHA_PROVIDER', default='recaptcha')
+
+# Failed attempts before requiring CAPTCHA (per IP + email combination)
+CAPTCHA_TRIGGER_THRESHOLD = config('CAPTCHA_TRIGGER_THRESHOLD', cast=int, default=3)
+
+# Cache timeout for failed login attempts (15 minutes)
+CAPTCHA_FAILED_LOGIN_TIMEOUT = config('CAPTCHA_FAILED_LOGIN_TIMEOUT', cast=int, default=900)
+
+# Google reCAPTCHA v3 Configuration
+RECAPTCHA_PUBLIC_KEY = config('RECAPTCHA_PUBLIC_KEY', default='')
+RECAPTCHA_PRIVATE_KEY = config('RECAPTCHA_PRIVATE_KEY', default='')
+RECAPTCHA_REQUIRED_SCORE = config('RECAPTCHA_REQUIRED_SCORE', cast=float, default=0.5)  # 0.0-1.0
+
+# Admin IPs that bypass CAPTCHA (optional - for internal tools)
+CAPTCHA_BYPASS_IPS = config('CAPTCHA_BYPASS_IPS', cast=Csv(), default='')
+
+# CAPTCHA applies to these actions
+CAPTCHA_PROTECTED_ACTIONS = ['login', 'register', 'password_reset']
+
+_secrets_logger.info(
+    "CAPTCHA enabled: %s, provider: %s, trigger threshold: %d attempts",
+    CAPTCHA_ENABLED, CAPTCHA_PROVIDER, CAPTCHA_TRIGGER_THRESHOLD
+)
+# =============================================================================
 
 # =============================================================================
 # CORS CONFIGURATION (SCRUM-41 — Harden Production CORS)
@@ -409,18 +446,85 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # =============================================================================
 
 # =============================================================================
-# EMAIL CONFIGURATION (Required for notifications)
+# RATE LIMITING & BRUTE FORCE PROTECTION (SCRUM-10)
 # =============================================================================
+# Django Axes - Authentication rate limiting and brute force protection
+# Prevents credential stuffing and brute force attacks on login endpoints
+
+# Lock out after 5 failed login attempts
+AXES_FAILURE_LIMIT = 5
+
+# Lockout duration: 15 minutes
+AXES_COOLOFF_TIME = timedelta(minutes=15)
+
+# Track by IP address and username combination
+AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True
+
+# Also track IP-only failures (not just username+IP)
+AXES_ONLY_USER_FAILURES = False
+
+# Reset failed attempts on successful login
+AXES_RESET_ON_SUCCESS = True
+
+# Enable axes globally
+AXES_ENABLED = True
+
+# Log lockout attempts for security monitoring
+AXES_VERBOSE = True
+
+# Store in database (not cache) for persistence
+AXES_HANDLER = 'axes.handlers.database.AxesDatabaseHandler'
+
+# IP resolution order when behind proxy (e.g., Nginx)
+AXES_META_PRECEDENCE_ORDER = [
+    'HTTP_X_FORWARDED_FOR',
+    'REMOTE_ADDR',
+]
+
+# Whitelist trusted IPs (none by default - add if needed)
+AXES_NEVER_LOCKOUT_WHITELIST = []
+
+# Use custom lockout response (will be JSON for API)
+AXES_LOCKOUT_TEMPLATE = None  # Returns 403 JSON response
+# =============================================================================
+
+# =============================================================================
+# EMAIL CONFIGURATION (SCRUM-117 - Password Reset)
+# =============================================================================
+# Email backend configuration for sending password reset emails
+# Use console backend in development, SMTP in production
+
+# Frontend URL for password reset links
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
 
-# Email backend configuration
-EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+# Email backend (console for dev, SMTP for production)
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend'
+)
+
+# SMTP Configuration (only used if EMAIL_BACKEND is set to SMTP)
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', cast=int, default=587)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool, default=True)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@capaciti.org.za')
+
+# Log email configuration (without exposing credentials)
+_secrets_logger.info(
+    "Email backend: %s (SMTP host: %s, port: %s, from: %s)",
+    EMAIL_BACKEND.split('.')[-1],
+    EMAIL_HOST if EMAIL_BACKEND != 'django.core.mail.backends.console.EmailBackend' else 'N/A',
+    EMAIL_PORT if EMAIL_BACKEND != 'django.core.mail.backends.console.EmailBackend' else 'N/A',
+    DEFAULT_FROM_EMAIL
+)
+
+if EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
+    _secrets_logger.warning(
+        "Using console email backend - emails will be printed to console (development only)"
+    )
+# =============================================================================
 
 # =============================================================================
 # INACTIVE ACCOUNT RETENTION (SCRUM-119 - POPIA Section 14)
@@ -433,12 +537,11 @@ INACTIVE_ACCOUNT_THRESHOLD_YEARS = config('INACTIVE_ACCOUNT_THRESHOLD_YEARS', ca
 # Grace period: Days between first warning and deletion
 INACTIVE_ACCOUNT_GRACE_PERIOD_DAYS = config('INACTIVE_ACCOUNT_GRACE_PERIOD_DAYS', cast=int, default=30)
 
-# Roles exempt from automatic deletion (admin accounts never auto-deleted)
+# Roles exempt from automatic deletion
 INACTIVE_ACCOUNT_EXCLUDE_ROLES = ['admin', 'superuser']
 
 _secrets_logger.info(
-    "Inactive account policy: %d years threshold, %d days grace period",
-    INACTIVE_ACCOUNT_THRESHOLD_YEARS,
-    INACTIVE_ACCOUNT_GRACE_PERIOD_DAYS
+    "Inactive account deletion: threshold=%d years, grace period=%d days",
+    INACTIVE_ACCOUNT_THRESHOLD_YEARS, INACTIVE_ACCOUNT_GRACE_PERIOD_DAYS
 )
 # =============================================================================
