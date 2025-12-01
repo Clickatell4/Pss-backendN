@@ -1,5 +1,6 @@
 from django.db import models
 from apps.users.models import User
+from auditlog.registry import auditlog
 
 class AdminNote(models.Model):
     CATEGORY_CHOICES = [
@@ -24,3 +25,8 @@ class AdminNote(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.candidate.email})"
+
+
+# SCRUM-8: Register AdminNote for audit logging
+# Tracks who creates/modifies admin notes about candidates
+auditlog.register(AdminNote)

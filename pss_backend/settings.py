@@ -123,6 +123,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
+    'auditlog',  # SCRUM-8: Audit logging for compliance
 
     # Local apps
     'apps.authentication',
@@ -144,6 +145,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'auditlog.middleware.AuditlogMiddleware',  # SCRUM-8: Track who made changes
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -377,6 +379,12 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        # Authentication event logging (SCRUM-8)
+        'django.security.auth': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 
@@ -384,3 +392,18 @@ LOGGING = {
 # DEFAULT AUTO FIELD
 # --------------------------------------------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# =============================================================================
+# AUDIT LOGGING (SCRUM-8 - POPIA Compliance)
+# =============================================================================
+# Django Auditlog - Tracks all changes to sensitive data
+# Required for POPIA compliance and security monitoring
+
+# Log retention: 2 years minimum for POPIA compliance
+# Note: Implement cleanup script for logs older than 2 years
+# AUDITLOG_INCLUDE_TRACKING_MODELS = True  # Track all registered models
+
+# Disable audit logging for select models (if needed)
+# AUDITLOG_EXCLUDE_TRACKING_MODELS = ['SomeModel']
+
+# =============================================================================

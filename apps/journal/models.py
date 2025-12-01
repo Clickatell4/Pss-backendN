@@ -1,5 +1,6 @@
 from django.db import models
 from apps.users.models import User
+from auditlog.registry import auditlog
 
 class JournalEntry(models.Model):
     ENERGY_CHOICES = [(i, i) for i in range(1, 11)]
@@ -29,3 +30,8 @@ class JournalEntry(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.date}"
+
+
+# SCRUM-8: Register JournalEntry for audit logging
+# Tracks all journal modifications for security monitoring
+auditlog.register(JournalEntry)
