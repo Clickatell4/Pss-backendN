@@ -19,3 +19,19 @@ class RegisterRateThrottle(AnonRateThrottle):
     Limit: 3 attempts per hour per IP
     """
     rate = '3/hour'
+
+
+class PasswordResetRequestThrottle(AnonRateThrottle):
+    """
+    Rate limiting for password reset request endpoint
+    Limit: 3 attempts per hour per IP (prevents email bombing)
+    """
+    rate = '3/hour'
+
+
+class PasswordResetConfirmThrottle(AnonRateThrottle):
+    """
+    Rate limiting for password reset confirmation endpoint
+    Limit: 5 attempts per 15 minutes per IP (prevents token brute-forcing)
+    """
+    rate = '5/15min'
