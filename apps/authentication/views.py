@@ -9,9 +9,20 @@ from apps.users.serializers import UserSerializer
 from apps.users.permissions import IsSuperuser, IsAdminOrSuperuser
 from pss_backend.throttles import AuthRateThrottle, RegisterRateThrottle
 from pss_backend.validators import sanitize_text, validate_email_domain, validate_text_length
+from pss_backend.captcha import (
+    verify_captcha,
+    track_failed_login_attempt,
+    reset_failed_login_attempts,
+    is_captcha_required,
+    get_client_ip,
+    create_login_identifier,
+    CaptchaVerificationError
+)
 from django.core.exceptions import ValidationError
+import logging
 
 User = get_user_model()
+logger = logging.getLogger('django.security.auth')
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
@@ -20,6 +31,7 @@ class LoginView(APIView):
     def post(self, request):
         email = request.data.get('email')
         password = request.data.get('password')
+        captcha_token = request.data.get('captcha_token')
 
         if not email or not password:
             return Response({
@@ -49,6 +61,50 @@ class LoginView(APIView):
                 'errors': {'password': [str(e)]}
             }, status=status.HTTP_400_BAD_REQUEST)
 
+        # SCRUM-120: CAPTCHA verification for brute force protection
+        client_ip = get_client_ip(request)
+        login_identifier = create_login_identifier(client_ip, email)
+
+        # Check if CAPTCHA is required based on failed attempts
+        captcha_required = is_captcha_required(login_identifier)
+
+        if captcha_required:
+            if not captcha_token:
+                logger.warning(
+                    f'CAPTCHA required but not provided for login attempt: {email} from {client_ip}'
+                )
+                return Response({
+                    'detail': 'Security verification required',
+                    'captcha_required': True,
+                    'message': 'Too many failed attempts. Please complete the security check.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Verify CAPTCHA
+            try:
+                success, score, error_message = verify_captcha(
+                    captcha_token,
+                    action='login',
+                    remote_ip=client_ip
+                )
+
+                if not success:
+                    logger.warning(
+                        f'CAPTCHA verification failed for {email} from {client_ip}: {error_message}'
+                    )
+                    return Response({
+                        'detail': 'Security verification failed',
+                        'captcha_required': True,
+                        'message': 'Please try again or contact support if you continue to have issues.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                logger.info(f'CAPTCHA verified successfully for {email} (score: {score})')
+
+            except CaptchaVerificationError as e:
+                logger.error(f'CAPTCHA service error for {email}: {str(e)}')
+                # Allow login to proceed if CAPTCHA service is down (fail open)
+                # but log for monitoring
+                pass
+
         try:
             user = authenticate(request, username=email, password=password)
 
@@ -58,6 +114,10 @@ class LoginView(APIView):
                         'detail': 'Account is deactivated'
                     }, status=status.HTTP_401_UNAUTHORIZED)
 
+                # Successful login - reset failed attempts
+                reset_failed_login_attempts(login_identifier)
+                logger.info(f'Successful login: {email} from {client_ip}')
+
                 refresh = RefreshToken.for_user(user)
                 user_data = UserSerializer(user).data
                 return Response({
@@ -66,11 +126,28 @@ class LoginView(APIView):
                     'user': user_data
                 }, status=status.HTTP_200_OK)
             else:
-                return Response({
+                # Failed login - track attempt
+                attempts = track_failed_login_attempt(login_identifier)
+                logger.warning(
+                    f'Failed login attempt: {email} from {client_ip} ({attempts} attempts)'
+                )
+
+                # Check if CAPTCHA will be required on next attempt
+                will_require_captcha = attempts >= 3
+
+                response_data = {
                     'detail': 'Invalid email or password'
-                }, status=status.HTTP_401_UNAUTHORIZED)
+                }
+
+                # Inform frontend if CAPTCHA will be required next time
+                if will_require_captcha:
+                    response_data['captcha_required'] = True
+                    response_data['message'] = 'Too many failed attempts. CAPTCHA will be required for next login.'
+
+                return Response(response_data, status=status.HTTP_401_UNAUTHORIZED)
 
         except Exception as e:
+            logger.error(f'Authentication error for {email}: {str(e)}')
             return Response({
                 'detail': 'Authentication error occurred'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
