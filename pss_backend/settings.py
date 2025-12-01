@@ -525,3 +525,23 @@ if EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
         "Using console email backend - emails will be printed to console (development only)"
     )
 # =============================================================================
+
+# =============================================================================
+# INACTIVE ACCOUNT RETENTION (SCRUM-119 - POPIA Section 14)
+# =============================================================================
+# Automatic deletion of inactive accounts to comply with data minimization
+
+# Inactivity threshold: Delete accounts after N years of no login
+INACTIVE_ACCOUNT_THRESHOLD_YEARS = config('INACTIVE_ACCOUNT_THRESHOLD_YEARS', cast=int, default=2)
+
+# Grace period: Days between first warning and deletion
+INACTIVE_ACCOUNT_GRACE_PERIOD_DAYS = config('INACTIVE_ACCOUNT_GRACE_PERIOD_DAYS', cast=int, default=30)
+
+# Roles exempt from automatic deletion
+INACTIVE_ACCOUNT_EXCLUDE_ROLES = ['admin', 'superuser']
+
+_secrets_logger.info(
+    "Inactive account deletion: threshold=%d years, grace period=%d days",
+    INACTIVE_ACCOUNT_THRESHOLD_YEARS, INACTIVE_ACCOUNT_GRACE_PERIOD_DAYS
+)
+# =============================================================================

@@ -171,6 +171,63 @@ class UserProfile(models.Model):
 
 
 # =============================================================================
+# SCRUM-119: Inactive Account Deletion Scheduling
+# =============================================================================
+
+class AccountDeletionSchedule(models.Model):
+    """
+    Tracks accounts scheduled for deletion due to inactivity.
+
+    POPIA Section 14: Retention and Restriction of Records
+    - Accounts inactive for 2+ years are scheduled for deletion
+    - 30-day grace period with email warnings
+    - Login during grace period cancels deletion
+    - Admin accounts are exempt from auto-deletion
+    """
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='deletion_schedule')
+    scheduled_deletion_date = models.DateTimeField(
+        help_text="Date when account will be permanently deleted"
+    )
+    first_warning_sent = models.DateTimeField(null=True, blank=True)
+    second_warning_sent = models.DateTimeField(null=True, blank=True)
+    exempted = models.BooleanField(
+        default=False,
+        help_text="If True, account is exempt from automatic deletion (admin override)"
+    )
+    exemption_reason = models.TextField(
+        blank=True,
+        help_text="Reason for exemption from automatic deletion"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['scheduled_deletion_date']
+        indexes = [
+            models.Index(fields=['scheduled_deletion_date', 'exempted']),
+        ]
+
+    def __str__(self):
+        status = "EXEMPTED" if self.exempted else f"scheduled for {self.scheduled_deletion_date.date()}"
+        return f"{self.user.email} - {status}"
+
+    @property
+    def days_until_deletion(self):
+        """Calculate days remaining until deletion."""
+        if self.exempted:
+            return None
+        delta = self.scheduled_deletion_date - timezone.now()
+        return max(0, delta.days)
+
+    @property
+    def is_overdue(self):
+        """Check if deletion date has passed."""
+        if self.exempted:
+            return False
+        return timezone.now() > self.scheduled_deletion_date
+
+
+# =============================================================================
 # SCRUM-8: Register models for audit logging (POPIA compliance)
 # =============================================================================
 # Tracks all changes to User and UserProfile for compliance and security monitoring
