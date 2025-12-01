@@ -11,3 +11,4 @@ python-dotenv==1.2.1
 dj-database-url==3.0.1
 django-encrypted-model-fields==0.6.5
 django-auditlog==3.0.0
+django-axes==7.0.0
