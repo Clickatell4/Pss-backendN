@@ -270,6 +270,40 @@ SIMPLE_JWT = {
 }
 
 # =============================================================================
+# CAPTCHA CONFIGURATION (SCRUM-120 - Enhanced Brute Force Protection)
+# =============================================================================
+# Integrates with rate limiting (SCRUM-10) to add human verification layer
+
+# Enable/disable CAPTCHA (useful for testing)
+CAPTCHA_ENABLED = config('CAPTCHA_ENABLED', cast=bool, default=True)
+
+# CAPTCHA provider ('recaptcha', 'hcaptcha', 'turnstile')
+CAPTCHA_PROVIDER = config('CAPTCHA_PROVIDER', default='recaptcha')
+
+# Failed attempts before requiring CAPTCHA (per IP + email combination)
+CAPTCHA_TRIGGER_THRESHOLD = config('CAPTCHA_TRIGGER_THRESHOLD', cast=int, default=3)
+
+# Cache timeout for failed login attempts (15 minutes)
+CAPTCHA_FAILED_LOGIN_TIMEOUT = config('CAPTCHA_FAILED_LOGIN_TIMEOUT', cast=int, default=900)
+
+# Google reCAPTCHA v3 Configuration
+RECAPTCHA_PUBLIC_KEY = config('RECAPTCHA_PUBLIC_KEY', default='')
+RECAPTCHA_PRIVATE_KEY = config('RECAPTCHA_PRIVATE_KEY', default='')
+RECAPTCHA_REQUIRED_SCORE = config('RECAPTCHA_REQUIRED_SCORE', cast=float, default=0.5)  # 0.0-1.0
+
+# Admin IPs that bypass CAPTCHA (optional - for internal tools)
+CAPTCHA_BYPASS_IPS = config('CAPTCHA_BYPASS_IPS', cast=Csv(), default='')
+
+# CAPTCHA applies to these actions
+CAPTCHA_PROTECTED_ACTIONS = ['login', 'register', 'password_reset']
+
+_secrets_logger.info(
+    "CAPTCHA enabled: %s, provider: %s, trigger threshold: %d attempts",
+    CAPTCHA_ENABLED, CAPTCHA_PROVIDER, CAPTCHA_TRIGGER_THRESHOLD
+)
+# =============================================================================
+
+# =============================================================================
 # CORS CONFIGURATION (SCRUM-41 — Harden Production CORS)
 # =============================================================================
 

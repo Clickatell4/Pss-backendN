@@ -2,6 +2,7 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseU
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from datetime import datetime, date
 from encrypted_model_fields.fields import EncryptedCharField, EncryptedTextField
 from auditlog.registry import auditlog
 
@@ -74,9 +75,12 @@ class UserProfile(models.Model):
     - Medical information (diagnosis, medications, allergies, medical_notes)
     - Doctor information (doctor_name, doctor_phone)
     - Emergency contacts (emergency_contact, emergency_phone)
+
+    SCRUM-118: Data Minimization
+    - Removed date_of_birth field (redundant with id_number)
+    - DOB can be calculated from SA ID number using date_of_birth_calculated property
     """
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    date_of_birth = models.DateField(null=True, blank=True)
 
     # Encrypted PII fields - SA ID number
     id_number = EncryptedCharField(max_length=255, null=True, blank=True)
@@ -108,6 +112,59 @@ class UserProfile(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def date_of_birth_calculated(self):
+        """
+        Calculate date of birth from SA ID number.
+
+        SA ID Format: YYMMDDGSSSCAZ
+        - YY: Year (2 digits)
+        - MM: Month (01-12)
+        - DD: Day (01-31)
+        - G: Gender (0-4 female, 5-9 male)
+        - SSS: Sequence number
+        - C: Citizenship (0=SA, 1=other)
+        - A: Usually 8 or 9
+        - Z: Checksum digit
+
+        Returns:
+            date: Calculated date of birth, or None if id_number is not set
+        """
+        if not self.id_number:
+            return None
+
+        try:
+            # Extract date components from ID number (first 6 digits)
+            yy = int(self.id_number[:2])
+            mm = int(self.id_number[2:4])
+            dd = int(self.id_number[4:6])
+
+            # Determine century (assume people are not over 100 years old)
+            current_year = datetime.now().year % 100
+            year = (1900 + yy) if yy > current_year else (2000 + yy)
+
+            # Validate and return date
+            return date(year, mm, dd)
+        except (ValueError, IndexError):
+            # Invalid ID number format or invalid date
+            return None
+
+    @property
+    def age_calculated(self):
+        """
+        Calculate age from date of birth (derived from ID number).
+
+        Returns:
+            int: Age in years, or None if DOB cannot be determined
+        """
+        dob = self.date_of_birth_calculated
+        if not dob:
+            return None
+
+        today = date.today()
+        age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+        return age
 
     def __str__(self):
         return f"profile: {self.user.email}"
