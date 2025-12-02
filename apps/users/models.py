@@ -1,8 +1,9 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from encrypted_model_fields.fields import EncryptedCharField, EncryptedTextField
 from auditlog.registry import auditlog
 
@@ -14,6 +15,11 @@ class UserManager(BaseUserManager):
             raise ValueError('The given email must be set')
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
+
+        # SCRUM-9: Validate password strength before setting
+        if password:
+            validate_password(password, user)
+
         user.set_password(password)
         user.save(using=self._db)
         return user
@@ -49,6 +55,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # SCRUM-9: Password expiry tracking (90-day policy)
+    password_last_changed = models.DateTimeField(default=timezone.now)
+
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
@@ -59,8 +68,53 @@ class User(AbstractBaseUser, PermissionsMixin):
         if self.email and not self.email.endswith('@capaciti.org.za'):
             raise ValidationError('Email must be a CAPACITI email address')
 
+    def is_password_expired(self):
+        """
+        Check if password has expired (90 days old).
+
+        Returns:
+            bool: True if password is expired, False otherwise
+        """
+        expiry_date = self.password_last_changed + timedelta(days=90)
+        return timezone.now() > expiry_date
+
     def save(self, *args, **kwargs):
         self.clean()
+
+        # SCRUM-9: Track password changes and prevent reuse
+        if self.pk:  # Existing user
+            try:
+                old_user = User.objects.get(pk=self.pk)
+
+                # Check if password changed
+                if old_user.password != self.password:
+                    # Check against password history (prevent reuse)
+                    from .popia_models import PasswordHistory  # Import here to avoid circular import
+                    history = PasswordHistory.objects.filter(user=self).order_by('-created_at')[:5]
+
+                    for hist in history:
+                        if self.check_password(hist.password_hash):
+                            raise ValidationError(
+                                'Cannot reuse your last 5 passwords. Please choose a different password.'
+                            )
+
+                    # Save old password to history
+                    PasswordHistory.objects.create(
+                        user=self,
+                        password_hash=old_user.password  # Store hashed password
+                    )
+
+                    # Keep only last 5 passwords in history
+                    old_passwords = PasswordHistory.objects.filter(user=self).order_by('-created_at')[5:]
+                    for old_pass in old_passwords:
+                        old_pass.delete()
+
+                    # Update password change timestamp
+                    self.password_last_changed = timezone.now()
+
+            except User.DoesNotExist:
+                pass  # New user, no history to check
+
         super().save(*args, **kwargs)
 
     def __str__(self):

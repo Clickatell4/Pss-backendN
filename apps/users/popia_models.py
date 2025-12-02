@@ -223,8 +223,46 @@ class DataExportRequest(models.Model):
         return f"Export Request: {self.user.email} ({self.get_status_display()})"
 
 
+# =============================================================================
+# SCRUM-9: Password History for Password Reuse Prevention
+# =============================================================================
+
+class PasswordHistory(models.Model):
+    """
+    Stores hashed passwords to prevent password reuse.
+
+    OWASP A07:2021 - Identification and Authentication Failures
+    Requirement: Prevent reuse of last 5 passwords
+
+    Security Note: Stores the already-hashed password (Django's PBKDF2 hash),
+    not the plaintext password. This is safe to store for comparison.
+    """
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='password_history'
+    )
+    password_hash = models.CharField(
+        max_length=255,
+        help_text="Hashed password (Django's password hash, not plaintext)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Password History"
+        verbose_name_plural = "Password Histories"
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} - Password changed at {self.created_at}"
+
+
 # Register all compliance models for audit logging
 auditlog.register(PrivacyPolicyVersion)
 auditlog.register(UserConsent)
 auditlog.register(DataDeletionRequest)
 auditlog.register(DataExportRequest)
+auditlog.register(PasswordHistory)  # SCRUM-9: Track password history changes
