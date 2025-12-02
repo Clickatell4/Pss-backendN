@@ -79,7 +79,11 @@ def _validate_secret_key(key):
             "=" * 70 + "\n"
         )
 
-_validate_secret_key(SECRET_KEY)
+# Only validate SECRET_KEY in non-test environments
+# Test environments need to use predictable keys for CI/CD
+if not (os.getenv('DJANGO_SETTINGS_MODULE') == 'pss_backend.test_settings' or
+        os.getenv('TESTING') == 'True'):
+    _validate_secret_key(SECRET_KEY)
 
 # Log successful SECRET_KEY load (without exposing the key)
 _secrets_logger.info(
