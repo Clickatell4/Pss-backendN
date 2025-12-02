@@ -2,7 +2,16 @@
 Test settings for PSS Backend
 Optimized for fast test execution with in-memory SQLite database
 """
-from .settings import *  # noqa: F403
+import os
+
+# Set SECRET_KEY BEFORE importing settings to bypass validation
+# This ensures tests can run with a known test key
+os.environ.setdefault(
+    'SECRET_KEY',
+    'django-insecure-test-key-for-testing-purposes-only-do-not-use-in-production-12345678'
+)
+
+from .settings import *  # noqa: F403, E402
 
 # Use fast password hasher for tests (speeds up user creation)
 PASSWORD_HASHERS = [
