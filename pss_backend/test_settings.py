@@ -54,8 +54,9 @@ REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {  # noqa: F405
     'register': '1000/minute',
 }
 
-# Use weak encryption key for tests (faster)
-FIELD_ENCRYPTION_KEY = 'test-encryption-key-32-bytes!!'
+# Use valid Fernet encryption key for tests
+# Generated with: python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+FIELD_ENCRYPTION_KEY = 'Hg8lygq6UnHNsSOOxj1T7KvFqlI6xhxso5ERVVLXGBI='
 
 # Disable Axes lockout for tests
 AXES_ENABLED = False

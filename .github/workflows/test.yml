@@ -42,7 +42,7 @@ jobs:
         DJANGO_SETTINGS_MODULE: pss_backend.test_settings
         SECRET_KEY: django-insecure-test-key-for-ci-testing-purposes-only-do-not-use-in-production-12345678
         DATABASE_URL: sqlite:///test.db
-        FIELD_ENCRYPTION_KEY: test-encryption-key-32-bytes!!
+        FIELD_ENCRYPTION_KEY: Hg8lygq6UnHNsSOOxj1T7KvFqlI6xhxso5ERVVLXGBI=
       run: |
         pytest --verbose --cov --cov-report=xml --cov-report=term-missing
 
