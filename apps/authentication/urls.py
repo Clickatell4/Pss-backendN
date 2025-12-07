@@ -10,6 +10,7 @@ from .views import (
     PasswordResetRequestView,
     PasswordResetValidateTokenView,
     PasswordResetConfirmView,
+    PasswordChangeView,
 )
 
 urlpatterns = [
@@ -26,4 +27,6 @@ urlpatterns = [
     path('password-reset/request/', PasswordResetRequestView.as_view(), name='password_reset_request'),
     path('password-reset/validate-token/', PasswordResetValidateTokenView.as_view(), name='password_reset_validate'),
     path('password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    # Password change endpoint for authenticated users (SCRUM-117)
+    path('password-change/', PasswordChangeView.as_view(), name='password_change'),
 ]
