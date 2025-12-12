@@ -1,0 +1,2 @@
+Welcome, {{ first_name }}!
+Your account has been successfully created.

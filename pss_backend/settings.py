@@ -165,7 +165,9 @@ ROOT_URLCONF = 'pss_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [
+            BASE_DIR / 'pss_backend' / 'templates'   # <-- ADD THIS
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -177,6 +179,7 @@ TEMPLATES = [
         },
     },
 ]
+
 
 WSGI_APPLICATION = 'pss_backend.wsgi.application'
 
@@ -543,6 +546,55 @@ if EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
         "Using console email backend - emails will be printed to console (development only)"
     )
 # =============================================================================
+# =============================================================================
+# EMAIL NOTIFICATIONS SYSTEM (SCRUM-28)
+# =============================================================================
+# Provides:
+# - Email templates (HTML + TXT)
+# - Synchronous + Celery async email sending
+# - Admin notification email
+# - Retry policy
+# - Feature toggles for queueing
+# =============================================================================
+
+# Directory paths for email templates
+EMAIL_TEMPLATE_DIR = BASE_DIR / "templates" / "emails"
+EMAIL_TEMPLATES_HTML_DIR = EMAIL_TEMPLATE_DIR / "html"
+EMAIL_TEMPLATES_TEXT_DIR = EMAIL_TEMPLATE_DIR / "txt"
+
+# Ensure folders exist (development convenience)
+os.makedirs(EMAIL_TEMPLATES_HTML_DIR, exist_ok=True)
+os.makedirs(EMAIL_TEMPLATES_TEXT_DIR, exist_ok=True)
+
+# Feature toggle — turn OFF to disable all outgoing emails (for CI or tests)
+EMAIL_NOTIFICATIONS_ENABLED = True
+
+# Queue toggle — if False, emails send synchronously (no Celery required)
+EMAIL_QUEUE_ENABLED = config("EMAIL_QUEUE_ENABLED", cast=bool, default=False)
+
+# Admin / system alert address
+ADMIN_NOTIFICATION_EMAIL = config("ADMIN_NOTIFICATION_EMAIL", default="admin@capaciti.org.za")
+
+# Retry policy for queued emails
+EMAIL_MAX_RETRIES = config("EMAIL_MAX_RETRIES", cast=int, default=3)
+EMAIL_RETRY_DELAY_SECONDS = config("EMAIL_RETRY_DELAY_SECONDS", cast=int, default=30)
+
+# Celery / Redis configuration
+# NOTE: Only used when EMAIL_QUEUE_ENABLED=True
+CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default=CELERY_BROKER_URL)
+
+# If EMAIL_QUEUE_ENABLED=False then Celery tasks run synchronously and no worker is required
+CELERY_TASK_ALWAYS_EAGER = not EMAIL_QUEUE_ENABLED
+CELERY_TASK_EAGER_PROPAGATES = True
+
+# Logging for visibility
+_secrets_logger.info(
+    "Email notification system enabled=%s, queue=%s, SMTP backend=%s",
+    EMAIL_NOTIFICATIONS_ENABLED,
+    EMAIL_QUEUE_ENABLED,
+    EMAIL_BACKEND.split('.')[-1],
+)
 
 # =============================================================================
 # INACTIVE ACCOUNT RETENTION (SCRUM-119 - POPIA Section 14)
