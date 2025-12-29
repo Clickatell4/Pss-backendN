@@ -1,0 +1,7 @@
+Admin Alert:
+
+A new admin/superuser account has been created.
+
+Email: {{ email }}
+
+PSS System
