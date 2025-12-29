@@ -1,9 +1,11 @@
 """
 SCRUM-117: Password Reset and Change Serializers
 SCRUM-30: Session Management Serializers
+SCRUM-14: Two-Factor Authentication Serializers
 
 Handles validation for password reset, confirmation, and password change operations
 Provides serialization for user session data and admin session management
+Provides validation for two-factor authentication setup and verification
 """
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
@@ -230,3 +232,200 @@ class AdminUserSessionSerializer(UserSessionSerializer):
             return 'admin'
         else:
             return 'candidate'
+
+
+# =============================================================================
+# SCRUM-14: Two-Factor Authentication Serializers
+# =============================================================================
+
+class TwoFactorSetupSerializer(serializers.Serializer):
+    """
+    Serializer for initiating 2FA setup.
+
+    No input fields required - uses authenticated user from context.
+
+    Returns:
+        - secret: Base32-encoded TOTP secret (for manual entry)
+        - qr_code_base64: Base64-encoded QR code image
+        - provisioning_uri: otpauth:// URI for manual setup
+        - issuer: Service name shown in authenticator app
+    """
+    # Output fields only (read-only)
+    secret = serializers.CharField(read_only=True)
+    qr_code_base64 = serializers.CharField(read_only=True)
+    provisioning_uri = serializers.CharField(read_only=True)
+    issuer = serializers.CharField(read_only=True)
+
+
+class TwoFactorVerifySetupSerializer(serializers.Serializer):
+    """
+    Serializer for verifying TOTP code during 2FA setup.
+
+    Validates that the user can successfully generate codes with their
+    authenticator app before enabling 2FA.
+
+    Input:
+        - totp_code: 6-digit code from authenticator app
+
+    Returns:
+        - backup_codes: List of 10 single-use backup codes (ONLY TIME SHOWN)
+        - message: Success message
+    """
+    totp_code = serializers.CharField(
+        required=True,
+        min_length=6,
+        max_length=6,
+        help_text="6-digit TOTP code from authenticator app"
+    )
+
+    def validate_totp_code(self, value):
+        """Validate TOTP code format"""
+        if not value.isdigit():
+            raise ValidationError("TOTP code must contain only digits")
+        return value
+
+
+class TwoFactorDisableSerializer(serializers.Serializer):
+    """
+    Serializer for disabling 2FA.
+
+    Requires password confirmation for security (prevents account takeover
+    if session is hijacked).
+
+    Input:
+        - password: User's current password (required)
+
+    Security:
+        - Admin/superuser roles cannot disable 2FA (mandatory enforcement)
+        - Password must be correct
+        - All backup codes deleted on disable
+    """
+    password = serializers.CharField(
+        required=True,
+        write_only=True,
+        min_length=1,
+        max_length=128,
+        help_text="Current password for confirmation"
+    )
+
+    def validate_password(self, value):
+        """Verify password is correct"""
+        user = self.context.get('user')
+        if not user:
+            raise ValidationError("User not found in context")
+
+        if not user.check_password(value):
+            raise ValidationError("Password is incorrect")
+
+        return value
+
+    def validate(self, data):
+        """Check if user is allowed to disable 2FA"""
+        user = self.context.get('user')
+
+        # Prevent admin/superuser from disabling 2FA (mandatory policy)
+        if user and user.role in ['admin', 'superuser']:
+            raise ValidationError({
+                'non_field_errors': '2FA is mandatory for admin and superuser accounts and cannot be disabled'
+            })
+
+        return data
+
+
+class TwoFactorVerifyCodeSerializer(serializers.Serializer):
+    """
+    Serializer for verifying TOTP or backup code during login.
+
+    Used in the second step of login flow after password authentication.
+
+    Input:
+        - email: User's email address
+        - code: Either 6-digit TOTP code OR 8-character backup code (XXXX-XXXX)
+
+    Returns:
+        - access: JWT access token (1 hour)
+        - refresh: JWT refresh token (7 days)
+        - user: User data (email, role, etc.)
+
+    Security:
+        - User must have passed password authentication first
+        - user_id temporarily stored in cache (5 min timeout)
+        - Backup codes are single-use
+        - TOTP codes have time window (±30 seconds)
+    """
+    email = serializers.EmailField(
+        required=True,
+        help_text="User's email address"
+    )
+    code = serializers.CharField(
+        required=True,
+        min_length=6,
+        max_length=9,  # Either 6-digit TOTP or 8-char + hyphen backup code
+        help_text="6-digit TOTP code or 8-character backup code (XXXX-XXXX)"
+    )
+
+    def validate_code(self, value):
+        """Normalize code (remove spaces, uppercase for backup codes)"""
+        normalized = value.strip().upper().replace(' ', '')
+
+        # Validate format (6 digits OR 8-9 alphanumeric with optional hyphen)
+        if len(normalized) == 6 and normalized.isdigit():
+            # TOTP code
+            return normalized
+        elif len(normalized) in [8, 9]:
+            # Backup code (with or without hyphen)
+            return normalized
+        else:
+            raise ValidationError(
+                "Code must be either a 6-digit TOTP code or an 8-character backup code (XXXX-XXXX)"
+            )
+
+
+class BackupCodesRegenerateSerializer(serializers.Serializer):
+    """
+    Serializer for regenerating backup codes.
+
+    Requires password confirmation for security.
+
+    Input:
+        - password: User's current password (required)
+
+    Returns:
+        - backup_codes: List of 10 new backup codes (ONLY TIME SHOWN)
+        - count: Number of codes generated
+
+    Security:
+        - Password must be correct
+        - All old backup codes are deleted
+        - New codes shown only once
+        - 2FA must be enabled
+    """
+    password = serializers.CharField(
+        required=True,
+        write_only=True,
+        min_length=1,
+        max_length=128,
+        help_text="Current password for confirmation"
+    )
+
+    def validate_password(self, value):
+        """Verify password is correct"""
+        user = self.context.get('user')
+        if not user:
+            raise ValidationError("User not found in context")
+
+        if not user.check_password(value):
+            raise ValidationError("Password is incorrect")
+
+        return value
+
+    def validate(self, data):
+        """Check if 2FA is enabled"""
+        user = self.context.get('user')
+
+        if user and not user.totp_enabled:
+            raise ValidationError({
+                'non_field_errors': '2FA must be enabled to regenerate backup codes'
+            })
+
+        return data

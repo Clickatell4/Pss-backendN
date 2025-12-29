@@ -84,6 +84,35 @@ class LoginView(APIView):
         if not user.is_active:
             return Response({"detail": "Account is deactivated"}, status=401)
 
+        # SCRUM-14: Check if 2FA is enabled
+        if user.totp_enabled:
+            # Store user_id in cache for 5 minutes
+            from django.core.cache import cache
+            cache_key = f'2fa_pending_{user.email}'
+            cache.set(cache_key, user.id, timeout=300)  # 5 minutes
+
+            logger.info(f"2FA REQUIRED | User: {user.email} | IP: {get_client_ip(request)}")
+
+            return Response({
+                'requires_2fa': True,
+                'email': user.email,
+                'message': 'Please enter your 2FA authentication code'
+            }, status=status.HTTP_200_OK)
+
+        # SCRUM-14: Check if 2FA is mandatory but not enabled (admin/superuser)
+        if user.role in ['admin', 'superuser'] and not user.totp_enabled:
+            logger.warning(
+                f"2FA SETUP REQUIRED | User: {user.email} | Role: {user.role} | "
+                f"IP: {get_client_ip(request)}"
+            )
+
+            return Response({
+                'requires_2fa_setup': True,
+                'message': '2FA is mandatory for admin and superuser accounts. Please set up 2FA to continue.',
+                'setup_url': '/auth/2fa/setup/'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        # No 2FA required - proceed with normal login
         refresh = RefreshToken.for_user(user)
 
         # SCRUM-30: Attach request context for session signal
@@ -847,3 +876,383 @@ class AdminForceLogoutView(APIView):
             return Response({
                 'detail': 'Failed to force logout user'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# =============================================================================
+# SCRUM-14: Two-Factor Authentication Views
+# =============================================================================
+
+class TwoFactorSetupView(APIView):
+    """
+    POST /auth/2fa/setup/
+
+    Initiate 2FA setup by generating TOTP secret and QR code.
+
+    Security:
+    - Requires authentication (IsAuthenticated)
+    - Prevents duplicate setup (if already enabled)
+    - Secret temporarily stored in cache (15 min expiry)
+    - Rate limited (AuthRateThrottle)
+
+    Returns:
+        - secret: Base32-encoded TOTP secret (for manual entry)
+        - qr_code_base64: Base64-encoded QR code image
+        - provisioning_uri: otpauth:// URI
+        - issuer: Service name
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        from django.core.cache import cache
+        from .totp_utils import generate_totp_secret, generate_qr_code
+        from .serializers import TwoFactorSetupSerializer
+
+        user = request.user
+
+        # Check if 2FA is already enabled
+        if user.totp_enabled:
+            return Response({
+                'detail': '2FA is already enabled for this account'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Generate TOTP secret
+        secret = generate_totp_secret()
+
+        # Generate QR code
+        qr_data = generate_qr_code(secret, user.email, issuer='PSS Backend')
+
+        # Store secret in cache for 15 minutes (until user verifies)
+        cache_key = f'2fa_setup_{user.id}'
+        cache.set(cache_key, secret, timeout=900)  # 15 minutes
+
+        # Log setup initiation
+        logger.info(f"2FA SETUP INITIATED | User: {user.email} | IP: {get_client_ip(request)}")
+
+        # Serialize and return
+        serializer = TwoFactorSetupSerializer(data=qr_data)
+        serializer.is_valid(raise_exception=True)
+
+        return Response({
+            **serializer.validated_data,
+            'issuer': 'PSS Backend',
+            'message': 'Scan the QR code with your authenticator app (Google Authenticator, Authy, etc.)'
+        }, status=status.HTTP_200_OK)
+
+
+class TwoFactorVerifySetupView(APIView):
+    """
+    POST /auth/2fa/verify-setup/
+
+    Verify TOTP code and enable 2FA for user.
+
+    Security:
+    - Requires authentication
+    - Verifies code against cached secret
+    - Saves encrypted secret to database
+    - Generates 10 single-use backup codes
+    - Backup codes shown ONLY ONCE
+    - Rate limited
+
+    Input:
+        - totp_code: 6-digit code from authenticator app
+
+    Returns:
+        - backup_codes: List of 10 backup codes (ONLY TIME SHOWN)
+        - message: Success message
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        from django.core.cache import cache
+        from .totp_utils import verify_totp_code
+        from .serializers import TwoFactorVerifySetupSerializer
+        from .models import TwoFactorBackupCode
+
+        user = request.user
+
+        # Validate input
+        serializer = TwoFactorVerifySetupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        totp_code = serializer.validated_data['totp_code']
+
+        # Get secret from cache
+        cache_key = f'2fa_setup_{user.id}'
+        secret = cache.get(cache_key)
+
+        if not secret:
+            return Response({
+                'detail': 'Setup session expired. Please restart 2FA setup.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verify TOTP code
+        if not verify_totp_code(secret, totp_code):
+            return Response({
+                'detail': 'Invalid TOTP code. Please try again.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Code is valid - enable 2FA
+        from django.utils import timezone
+
+        user.totp_secret = secret  # Encrypted automatically
+        user.totp_enabled = True
+        user.totp_enabled_at = timezone.now()
+        user.save(update_fields=['totp_secret', 'totp_enabled', 'totp_enabled_at'])
+
+        # Generate backup codes
+        backup_codes = TwoFactorBackupCode.generate_codes(user, count=10)
+
+        # Clear cache
+        cache.delete(cache_key)
+
+        # Log successful setup
+        logger.info(f"2FA ENABLED | User: {user.email} | IP: {get_client_ip(request)}")
+
+        return Response({
+            'message': '2FA has been successfully enabled for your account',
+            'backup_codes': backup_codes,
+            'backup_codes_warning': 'Save these backup codes in a secure location. They will not be shown again.'
+        }, status=status.HTTP_200_OK)
+
+
+class TwoFactorDisableView(APIView):
+    """
+    POST /auth/2fa/disable/
+
+    Disable 2FA for user (candidates only).
+
+    Security:
+    - Requires authentication
+    - Requires password confirmation
+    - Admin/superuser CANNOT disable (mandatory policy)
+    - Deletes all backup codes
+    - Clears TOTP secret
+    - Rate limited
+
+    Input:
+        - password: User's current password (required)
+
+    Returns:
+        - message: Success message
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        from .serializers import TwoFactorDisableSerializer
+        from .models import TwoFactorBackupCode
+
+        user = request.user
+
+        # Validate input (includes password check and role check)
+        serializer = TwoFactorDisableSerializer(
+            data=request.data,
+            context={'user': user}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        # Check if 2FA is enabled
+        if not user.totp_enabled:
+            return Response({
+                'detail': '2FA is not enabled for this account'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Disable 2FA
+        user.totp_secret = None
+        user.totp_enabled = False
+        user.totp_enabled_at = None
+        user.totp_last_used = None
+        user.save(update_fields=['totp_secret', 'totp_enabled', 'totp_enabled_at', 'totp_last_used'])
+
+        # Delete all backup codes
+        TwoFactorBackupCode.objects.filter(user=user).delete()
+
+        # Log disable action
+        logger.warning(f"2FA DISABLED | User: {user.email} | IP: {get_client_ip(request)}")
+
+        return Response({
+            'message': '2FA has been disabled for your account'
+        }, status=status.HTTP_200_OK)
+
+
+class TwoFactorVerifyCodeView(APIView):
+    """
+    POST /auth/2fa/verify-code/
+
+    Verify TOTP or backup code during login (second step).
+
+    Security:
+    - Requires prior password authentication (user_id in cache)
+    - Verifies either TOTP code OR backup code
+    - Backup codes are single-use
+    - Issues JWT tokens on success
+    - Creates user session (SCRUM-30 integration)
+    - Rate limited (5 attempts/15min)
+
+    Input:
+        - email: User's email
+        - code: 6-digit TOTP OR 8-char backup code (XXXX-XXXX)
+
+    Returns:
+        - access: JWT access token (1 hour)
+        - refresh: JWT refresh token (7 days)
+        - user: User data
+    """
+    permission_classes = [AllowAny]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        from django.core.cache import cache
+        from .totp_utils import verify_totp_code
+        from .serializers import TwoFactorVerifyCodeSerializer
+        from .models import TwoFactorBackupCode
+        from rest_framework_simplejwt.tokens import RefreshToken
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+        from apps.users.serializers import UserSerializer
+
+        # Validate input
+        serializer = TwoFactorVerifyCodeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data['email']
+        code = serializer.validated_data['code']
+
+        # Get user_id from cache (set during password authentication)
+        cache_key = f'2fa_pending_{email}'
+        user_id = cache.get(cache_key)
+
+        if not user_id:
+            return Response({
+                'detail': '2FA session expired. Please login again with your email and password.'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Get user
+        try:
+            user = User.objects.get(id=user_id, email=email)
+        except User.DoesNotExist:
+            return Response({
+                'detail': 'Invalid session'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Check if 2FA is enabled
+        if not user.totp_enabled or not user.totp_secret:
+            return Response({
+                'detail': '2FA is not properly configured'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Try to verify code (TOTP or backup)
+        verified = False
+        method = None
+
+        # Check if it's a TOTP code (6 digits)
+        if len(code) == 6 and code.isdigit():
+            verified = verify_totp_code(user.totp_secret, code)
+            method = 'TOTP'
+        # Otherwise try as backup code (8-9 chars with optional hyphen)
+        else:
+            verified = TwoFactorBackupCode.verify_code(user, code)
+            method = 'Backup Code'
+
+        if not verified:
+            logger.warning(
+                f"2FA VERIFICATION FAILED | User: {email} | Method: {method} | "
+                f"IP: {get_client_ip(request)}"
+            )
+
+            return Response({
+                'detail': 'Invalid 2FA code'
+            }, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Code verified - update last used timestamp
+        from django.utils import timezone
+        user.totp_last_used = timezone.now()
+        user.save(update_fields=['totp_last_used'])
+
+        # Clear cache
+        cache.delete(cache_key)
+
+        # Issue JWT tokens
+        refresh = RefreshToken.for_user(user)
+
+        # SCRUM-30: Create session (same as LoginView)
+        try:
+            outstanding_token = OutstandingToken.objects.filter(
+                user=user,
+                token=str(refresh)
+            ).latest('created_at')
+
+            # Attach request context for signal handler
+            outstanding_token._request_context = request
+            outstanding_token.save()
+        except OutstandingToken.DoesNotExist:
+            pass
+        except Exception as e:
+            logger.warning(f"Failed to create session for 2FA login: {str(e)}")
+
+        # Log successful 2FA login
+        logger.info(
+            f"2FA LOGIN SUCCESS | User: {email} | Method: {method} | "
+            f"IP: {get_client_ip(request)}"
+        )
+
+        user_data = UserSerializer(user).data
+
+        return Response({
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': user_data
+        }, status=status.HTTP_200_OK)
+
+
+class BackupCodesRegenerateView(APIView):
+    """
+    POST /auth/2fa/backup-codes/
+
+    Regenerate backup codes (deletes old ones).
+
+    Security:
+    - Requires authentication
+    - Requires password confirmation
+    - 2FA must be enabled
+    - Deletes all old codes
+    - Generates 10 new codes
+    - Codes shown ONLY ONCE
+    - Rate limited
+
+    Input:
+        - password: User's current password (required)
+
+    Returns:
+        - backup_codes: List of 10 new backup codes
+        - count: Number of codes generated
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        from .serializers import BackupCodesRegenerateSerializer
+        from .models import TwoFactorBackupCode
+
+        user = request.user
+
+        # Validate input (includes password check and 2FA enabled check)
+        serializer = BackupCodesRegenerateSerializer(
+            data=request.data,
+            context={'user': user}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        # Generate new backup codes (deletes old ones automatically)
+        backup_codes = TwoFactorBackupCode.generate_codes(user, count=10)
+
+        # Log regeneration
+        logger.info(f"BACKUP CODES REGENERATED | User: {user.email} | IP: {get_client_ip(request)}")
+
+        return Response({
+            'message': 'Backup codes have been regenerated',
+            'backup_codes': backup_codes,
+            'count': len(backup_codes),
+            'warning': 'Save these backup codes in a secure location. They will not be shown again.'
+        }, status=status.HTTP_200_OK)
