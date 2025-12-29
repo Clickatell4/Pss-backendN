@@ -1,6 +1,7 @@
 """
 SCRUM-117: Password Reset and Change Serializers
 SCRUM-30: Session Management Serializers
+
 Handles validation for password reset, confirmation, and password change operations
 Provides serialization for user session data and admin session management
 """
