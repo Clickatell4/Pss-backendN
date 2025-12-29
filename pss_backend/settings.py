@@ -153,6 +153,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'axes.middleware.AxesMiddleware',  # SCRUM-10: Must be after AuthenticationMiddleware
     'auditlog.middleware.AuditlogMiddleware',  # SCRUM-8: Track who made changes
+    'apps.authentication.middleware.SessionActivityMiddleware',  # SCRUM-30: Track session activity
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]

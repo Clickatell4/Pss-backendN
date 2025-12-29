@@ -13,6 +13,7 @@ django-encrypted-model-fields==0.6.5
 django-auditlog==3.0.0
 django-axes==7.0.0
 django-recaptcha==4.1.0
+user-agents==2.2.0  # SCRUM-30: User agent parsing for device detection
 
 # Testing dependencies
 pytest==8.3.4
