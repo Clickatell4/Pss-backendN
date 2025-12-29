@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0009_add_password_policy_fields'),
+        ('users', '0011_create_role_groups'),
     ]
 
     operations = [

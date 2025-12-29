@@ -35,7 +35,7 @@ def create_groups_and_permissions(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("users", "0010_remove_accountdeletionschedule_users_accou_schedul_0f1f41_idx_and_more"),
+        ("users", "0010_add_2fa_fields"),
         ("auth", "__latest__"),
     ]
 
