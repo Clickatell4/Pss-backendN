@@ -19,8 +19,14 @@ from pss_backend.throttles import (
     PasswordResetRequestThrottle,
     PasswordResetConfirmThrottle
 )
-from apps.authentication.models import PasswordResetToken
-from apps.authentication.serializers import PasswordChangeSerializer
+from pss_backend.validators import sanitize_text, validate_email_domain, validate_text_length
+from django.core.exceptions import ValidationError
+from apps.authentication.models import PasswordResetToken, UserSession
+from apps.authentication.serializers import (
+    PasswordChangeSerializer,
+    UserSessionSerializer,
+    AdminUserSessionSerializer
+)
 from apps.authentication.email_utils import send_password_reset_email, send_password_change_confirmation_email
 from apps.authentication.email_service import send_email
 from apps.users.popia_models import PasswordHistory
@@ -79,6 +85,24 @@ class LoginView(APIView):
             return Response({"detail": "Account is deactivated"}, status=401)
 
         refresh = RefreshToken.for_user(user)
+
+        # SCRUM-30: Attach request context for session signal
+        try:
+            outstanding_token = OutstandingToken.objects.filter(
+                user=user,
+                token=str(refresh)
+            ).latest('created_at')
+
+            # Temporarily attach request context for signal handler
+            outstanding_token._request_context = request
+            outstanding_token.save()
+        except OutstandingToken.DoesNotExist:
+            # If token doesn't exist, session won't be created (logged in signal)
+            pass
+        except Exception as e:
+            # Don't break login if session creation fails
+            logger.warning(f"Failed to attach request context for session: {str(e)}")
+
         return Response({
             "access": str(refresh.access_token),
             "refresh": str(refresh),
@@ -485,6 +509,341 @@ class PasswordChangeView(APIView):
         """Send confirmation email after successful password change."""
         # Use the new email utility for better formatted emails
         send_password_change_confirmation_email(user)
-=======
-        return Response({"message": "Password has been reset successfully."})
->>>>>>> origin/main
+
+
+# SCRUM-30: Session Management Views
+
+class SessionListView(APIView):
+    """
+    GET /auth/sessions/
+
+    List all active sessions for the authenticated user.
+    Shows device info, location, activity timestamps, and flags current session.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AuthRateThrottle]
+
+    def get(self, request):
+        """List all sessions for the current user."""
+        try:
+            # Get all active sessions for the user
+            sessions = UserSession.objects.filter(
+                user=request.user,
+                terminated_at__isnull=True
+            ).order_by('-last_activity')
+
+            # Mark the current session (most recently active)
+            current_session = sessions.first()
+            current_session_id = current_session.id if current_session else None
+
+            # Serialize sessions
+            serializer = UserSessionSerializer(
+                sessions,
+                many=True,
+                context={'current_session_id': current_session_id}
+            )
+
+            return Response({
+                'sessions': serializer.data,
+                'count': sessions.count()
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error listing sessions for {request.user.email}: {str(e)}")
+            return Response({
+                'detail': 'Failed to retrieve sessions'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SessionDeleteView(APIView):
+    """
+    DELETE /auth/sessions/{session_key}/
+
+    Terminate a specific session. User can only delete their own sessions.
+    Cannot delete current session (use /auth/logout/ instead).
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AuthRateThrottle]
+
+    def delete(self, request, session_key):
+        """Delete a specific session."""
+        try:
+            # Get the session
+            session = UserSession.objects.filter(
+                session_key=session_key,
+                user=request.user,
+                terminated_at__isnull=True
+            ).first()
+
+            if not session:
+                return Response({
+                    'detail': 'Session not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Prevent deleting current session
+            # The current session is the most recently active one
+            current_session = UserSession.objects.filter(
+                user=request.user,
+                terminated_at__isnull=True
+            ).order_by('-last_activity').first()
+
+            if current_session and session.id == current_session.id:
+                return Response({
+                    'detail': 'Cannot delete current session. Use /auth/logout/ to logout.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Terminate the session
+            session.terminate()
+
+            logger.info(
+                f"Session terminated | User: {request.user.email} | "
+                f"Device: {session.device_type} | Session: {session_key[:16]}..."
+            )
+
+            return Response({
+                'message': 'Session terminated successfully',
+                'device': session.device_type,
+                'browser': session.browser
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error deleting session for {request.user.email}: {str(e)}")
+            return Response({
+                'detail': 'Failed to delete session'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SessionDeleteAllView(APIView):
+    """
+    DELETE /auth/sessions/all/
+
+    Terminate ALL sessions for the authenticated user, including current session.
+    Useful when user suspects account compromise.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AuthRateThrottle]
+
+    def delete(self, request):
+        """Delete all sessions for the current user."""
+        try:
+            # Get all active sessions
+            sessions = UserSession.objects.filter(
+                user=request.user,
+                terminated_at__isnull=True
+            )
+
+            count = sessions.count()
+
+            # Terminate all sessions
+            for session in sessions:
+                session.terminate()
+
+            logger.warning(
+                f"All sessions terminated | User: {request.user.email} | Count: {count}"
+            )
+
+            return Response({
+                'message': 'All sessions terminated successfully',
+                'count': count,
+                'detail': 'You have been logged out from all devices.'
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error deleting all sessions for {request.user.email}: {str(e)}")
+            return Response({
+                'detail': 'Failed to delete all sessions'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SessionDeleteAllExceptCurrentView(APIView):
+    """
+    DELETE /auth/sessions/all-except-current/
+
+    Terminate all OTHER sessions for the user, keeping current session active.
+    Useful for "logout from other devices" feature.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AuthRateThrottle]
+
+    def delete(self, request):
+        """Delete all sessions except the current one."""
+        try:
+            # Get all active sessions
+            all_sessions = UserSession.objects.filter(
+                user=request.user,
+                terminated_at__isnull=True
+            ).order_by('-last_activity')
+
+            # Current session is the most recently active
+            current_session = all_sessions.first()
+
+            if not current_session:
+                return Response({
+                    'message': 'No sessions to terminate',
+                    'count': 0
+                }, status=status.HTTP_200_OK)
+
+            # Get sessions to terminate (all except current)
+            sessions_to_terminate = all_sessions.exclude(id=current_session.id)
+
+            count = sessions_to_terminate.count()
+            terminated_devices = []
+
+            # Terminate sessions
+            for session in sessions_to_terminate:
+                terminated_devices.append({
+                    'device': session.device_type,
+                    'browser': session.browser,
+                    'last_activity': session.last_activity
+                })
+                session.terminate()
+
+            logger.info(
+                f"Other sessions terminated | User: {request.user.email} | Count: {count}"
+            )
+
+            return Response({
+                'message': f'Terminated {count} other session(s)',
+                'count': count,
+                'terminated_devices': terminated_devices
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error deleting other sessions for {request.user.email}: {str(e)}")
+            return Response({
+                'detail': 'Failed to delete other sessions'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AdminSessionListView(APIView):
+    """
+    GET /auth/admin/sessions/
+
+    List all user sessions (admin only).
+    Supports filtering by user_email, active_only, suspicious_only.
+    """
+    permission_classes = [IsAdminOrSuperuser]
+    throttle_classes = [AuthRateThrottle]
+
+    def get(self, request):
+        """List all sessions with filtering options."""
+        try:
+            # Start with all sessions
+            sessions = UserSession.objects.all()
+
+            # Filter by user email
+            user_email = request.query_params.get('user_email')
+            if user_email:
+                sessions = sessions.filter(user__email__icontains=user_email)
+
+            # Filter by active status
+            active_only = request.query_params.get('active_only', '').lower() == 'true'
+            if active_only:
+                sessions = sessions.filter(
+                    terminated_at__isnull=True,
+                    expires_at__gt=timezone.now()
+                )
+
+            # Filter by suspicious flag
+            suspicious_only = request.query_params.get('suspicious_only', '').lower() == 'true'
+            if suspicious_only:
+                sessions = sessions.filter(is_suspicious=True)
+
+            # Order by most recent activity
+            sessions = sessions.order_by('-last_activity')
+
+            # Serialize sessions
+            serializer = AdminUserSessionSerializer(sessions, many=True)
+
+            return Response({
+                'sessions': serializer.data,
+                'count': sessions.count(),
+                'filters': {
+                    'user_email': user_email,
+                    'active_only': active_only,
+                    'suspicious_only': suspicious_only
+                }
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error listing all sessions (admin): {str(e)}")
+            return Response({
+                'detail': 'Failed to retrieve sessions'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AdminForceLogoutView(APIView):
+    """
+    POST /auth/admin/force-logout/
+
+    Force logout a user by terminating all their sessions (admin only).
+    Requires reason for audit compliance.
+    Prevents force logout of superusers unless requester is superuser.
+    """
+    permission_classes = [IsAdminOrSuperuser]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        """Force logout a user."""
+        try:
+            user_id = request.data.get('user_id')
+            reason = request.data.get('reason', '')
+
+            if not user_id:
+                return Response({
+                    'detail': 'user_id is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if not reason:
+                return Response({
+                    'detail': 'reason is required for audit compliance'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get target user
+            try:
+                target_user = User.objects.get(id=user_id)
+            except User.DoesNotExist:
+                return Response({
+                    'detail': 'User not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Security check: Prevent force logout of superusers unless requester is superuser
+            if target_user.is_superuser and not request.user.is_superuser:
+                logger.warning(
+                    f"Force logout attempt denied | Admin: {request.user.email} | "
+                    f"Target: {target_user.email} (superuser)"
+                )
+                return Response({
+                    'detail': 'Cannot force logout a superuser'
+                }, status=status.HTTP_403_FORBIDDEN)
+
+            # Get all active sessions
+            sessions = UserSession.objects.filter(
+                user=target_user,
+                terminated_at__isnull=True
+            )
+
+            count = sessions.count()
+
+            # Terminate all sessions
+            for session in sessions:
+                session.terminate()
+
+            # Log admin action with reason (CRITICAL for audit)
+            logger.warning(
+                f"ADMIN FORCE LOGOUT | Admin: {request.user.email} | "
+                f"Target: {target_user.email} | Sessions: {count} | Reason: {reason}"
+            )
+
+            return Response({
+                'message': f'Force logged out {target_user.email}',
+                'sessions_terminated': count,
+                'target_user': target_user.email,
+                'reason': reason
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error force logging out user: {str(e)}")
+            return Response({
+                'detail': 'Failed to force logout user'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

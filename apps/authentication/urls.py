@@ -10,6 +10,13 @@ from .views import (
     PasswordResetConfirmView,
     PasswordChangeView,
     PasswordResetValidateTokenView,
+    # SCRUM-30: Session management views
+    SessionListView,
+    SessionDeleteView,
+    SessionDeleteAllView,
+    SessionDeleteAllExceptCurrentView,
+    AdminSessionListView,
+    AdminForceLogoutView,
 )
 
 urlpatterns = [
@@ -29,4 +36,15 @@ urlpatterns = [
 
     # Password change endpoint for authenticated users
     path("password-change/", PasswordChangeView.as_view(), name="password-change"),
+
+    # Session management endpoints (SCRUM-30)
+    # IMPORTANT: Place specific paths BEFORE parameterized paths to avoid routing conflicts
+    path("sessions/", SessionListView.as_view(), name="session-list"),
+    path("sessions/all/", SessionDeleteAllView.as_view(), name="session-delete-all"),
+    path("sessions/all-except-current/", SessionDeleteAllExceptCurrentView.as_view(), name="session-delete-all-except-current"),
+    path("sessions/<str:session_key>/", SessionDeleteView.as_view(), name="session-delete"),
+
+    # Admin session management endpoints (SCRUM-30)
+    path("admin/sessions/", AdminSessionListView.as_view(), name="admin-session-list"),
+    path("admin/force-logout/", AdminForceLogoutView.as_view(), name="admin-force-logout"),
 ]
