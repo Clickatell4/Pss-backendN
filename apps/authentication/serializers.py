@@ -1,8 +1,11 @@
 """
 SCRUM-117: Password Reset and Change Serializers
 SCRUM-30: Session Management Serializers
+SCRUM-14: Two-Factor Authentication Serializers
+
 Handles validation for password reset, confirmation, and password change operations
 Provides serialization for user session data and admin session management
+Provides validation for two-factor authentication setup and verification
 """
 from rest_framework import serializers
 from django.contrib.auth import get_user_model

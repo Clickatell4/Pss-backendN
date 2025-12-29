@@ -26,3 +26,5 @@ factory-boy==3.3.1
 faker==33.1.0
 freezegun==1.5.1
 responses==0.25.3
+django-anymail
+sendgrid
