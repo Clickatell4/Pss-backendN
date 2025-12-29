@@ -303,6 +303,144 @@ class UserSession(models.Model):
         return f"{self.user.email} - {self.device_type} ({status})"
 
 
+# =============================================================================
+# SCRUM-14: Two-Factor Authentication Backup Codes
+# =============================================================================
+
+class TwoFactorBackupCode(models.Model):
+    """
+    SCRUM-14: Backup codes for 2FA recovery
+
+    Backup codes allow users to login when they don't have access to their
+    authenticator app. Each code is single-use and hashed like a password.
+
+    Security:
+    - Codes are hashed with SHA256 (irreversible, like passwords)
+    - Each code can only be used once
+    - Format: XXXX-XXXX (8 characters, easy to type)
+    - 10 codes generated per user by default
+    """
+    user = models.ForeignKey(
+        'users.User',
+        on_delete=models.CASCADE,
+        related_name='backup_codes',
+        help_text="User who owns this backup code"
+    )
+    code_hash = models.CharField(
+        max_length=128,
+        db_index=True,
+        help_text="SHA256 hash of backup code"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+        help_text="When this code was generated"
+    )
+    used = models.BooleanField(
+        default=False,
+        help_text="Whether this code has been used"
+    )
+    used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this code was used"
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'used']),
+        ]
+
+    @classmethod
+    def generate_codes(cls, user, count=10):
+        """
+        Generate backup codes for user.
+
+        Args:
+            user: User instance
+            count: Number of codes to generate (default: 10)
+
+        Returns:
+            list: Plaintext backup codes in format XXXX-XXXX
+                  (shown once, never stored in plaintext)
+        """
+        import hashlib
+        import secrets
+        import string
+
+        # Delete existing codes
+        cls.objects.filter(user=user).delete()
+
+        codes = []
+        for _ in range(count):
+            # Generate random 8-character code (alphanumeric)
+            code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+            # Format as XXXX-XXXX for readability
+            formatted_code = f"{code[:4]}-{code[4:]}"
+
+            # Hash the code (SHA256)
+            code_hash = hashlib.sha256(formatted_code.encode()).hexdigest()
+
+            # Save to database
+            cls.objects.create(
+                user=user,
+                code_hash=code_hash
+            )
+
+            # Add to return list (plaintext, shown only once)
+            codes.append(formatted_code)
+
+        return codes
+
+    @classmethod
+    def verify_code(cls, user, code):
+        """
+        Verify backup code and mark as used.
+
+        Args:
+            user: User instance
+            code: Plaintext backup code
+
+        Returns:
+            bool: True if code is valid and unused, False otherwise
+        """
+        import hashlib
+
+        # Normalize code (remove spaces, convert to uppercase)
+        normalized_code = code.strip().upper().replace(' ', '')
+
+        # Add hyphen if missing (user might enter without hyphen)
+        if len(normalized_code) == 8 and '-' not in normalized_code:
+            normalized_code = f"{normalized_code[:4]}-{normalized_code[4:]}"
+
+        # Hash the code
+        code_hash = hashlib.sha256(normalized_code.encode()).hexdigest()
+
+        # Find matching unused code
+        try:
+            backup_code = cls.objects.get(
+                user=user,
+                code_hash=code_hash,
+                used=False
+            )
+            # Mark as used
+            backup_code.mark_as_used()
+            return True
+        except cls.DoesNotExist:
+            return False
+
+    def mark_as_used(self):
+        """Mark this backup code as used."""
+        self.used = True
+        self.used_at = timezone.now()
+        self.save(update_fields=['used', 'used_at'])
+
+    def __str__(self):
+        status = "USED" if self.used else "UNUSED"
+        return f"{self.user.email} - Backup Code ({status})"
+
+
 # SCRUM-8: Register models with auditlog for POPIA compliance
 from auditlog.registry import auditlog
 
@@ -311,3 +449,6 @@ auditlog.register(PasswordResetToken)
 
 # Register UserSession for audit trail (exclude last_activity to reduce noise)
 auditlog.register(UserSession, exclude_fields=['last_activity'])
+
+# SCRUM-14: Register TwoFactorBackupCode for audit trail
+auditlog.register(TwoFactorBackupCode)

@@ -1,11 +1,12 @@
 """
 SCRUM-30: Django Admin Configuration for Session Management
-Rich admin interface for viewing and managing user sessions and password reset tokens
+SCRUM-14: Django Admin Configuration for Two-Factor Authentication
+Rich admin interface for viewing and managing user sessions, password reset tokens, and 2FA backup codes
 """
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils import timezone
-from apps.authentication.models import UserSession, PasswordResetToken
+from apps.authentication.models import UserSession, PasswordResetToken, TwoFactorBackupCode
 
 
 @admin.register(UserSession)
@@ -281,4 +282,110 @@ class PasswordResetTokenAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         """Disable editing tokens via admin (view-only)."""
+        return False
+
+
+# =============================================================================
+# SCRUM-14: Two-Factor Authentication Admin
+# =============================================================================
+
+@admin.register(TwoFactorBackupCode)
+class TwoFactorBackupCodeAdmin(admin.ModelAdmin):
+    """
+    Django admin interface for TwoFactorBackupCode model.
+
+    Features:
+    - Status badges with colors (Used/Unused)
+    - Filtering by status and dates
+    - Search by user email
+    - Admin action to invalidate codes
+    - All fields readonly (no editing)
+    """
+
+    list_display = [
+        'id',
+        'user_email',
+        'status_badge',
+        'created_at',
+        'used_at',
+    ]
+
+    list_filter = [
+        'used',
+        'created_at',
+        'used_at',
+    ]
+
+    search_fields = [
+        'user__email',
+    ]
+
+    readonly_fields = [
+        'user',
+        'code_hash',
+        'created_at',
+        'used',
+        'used_at',
+        'status_badge',
+    ]
+
+    fieldsets = (
+        ('User Information', {
+            'fields': ('user', 'code_hash')
+        }),
+        ('Status', {
+            'fields': ('status_badge', 'used', 'used_at')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',)
+        }),
+    )
+
+    ordering = ['-created_at']
+
+    actions = ['invalidate_codes']
+
+    def user_email(self, obj):
+        """Display user email."""
+        return obj.user.email if obj.user else 'N/A'
+    user_email.short_description = 'User'
+    user_email.admin_order_field = 'user__email'
+
+    def status_badge(self, obj):
+        """Display status with color badge."""
+        if obj.used:
+            color = '#6c757d'  # Gray
+            status = 'USED'
+        else:
+            color = '#28a745'  # Green
+            status = 'UNUSED'
+
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 8px; '
+            'border-radius: 3px; font-weight: bold;">{}</span>',
+            color,
+            status
+        )
+    status_badge.short_description = 'Status'
+
+    def invalidate_codes(self, request, queryset):
+        """Admin action to mark selected backup codes as used (invalidate)."""
+        count = 0
+        for code in queryset:
+            if not code.used:
+                code.mark_as_used()
+                count += 1
+
+        self.message_user(
+            request,
+            f'Invalidated {count} backup code(s).'
+        )
+    invalidate_codes.short_description = 'Invalidate selected backup codes'
+
+    def has_add_permission(self, request):
+        """Disable adding backup codes via admin (created automatically)."""
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        """Disable editing backup codes via admin (view-only)."""
         return False

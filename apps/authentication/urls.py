@@ -18,6 +18,12 @@ from .views import (
     SessionDeleteAllExceptCurrentView,
     AdminSessionListView,
     AdminForceLogoutView,
+    # SCRUM-14: Two-Factor Authentication views
+    TwoFactorSetupView,
+    TwoFactorVerifySetupView,
+    TwoFactorDisableView,
+    TwoFactorVerifyCodeView,
+    BackupCodesRegenerateView,
 )
 
 urlpatterns = [
@@ -45,4 +51,10 @@ urlpatterns = [
     # Admin session management endpoints (SCRUM-30)
     path('admin/sessions/', AdminSessionListView.as_view(), name='admin_session_list'),
     path('admin/force-logout/', AdminForceLogoutView.as_view(), name='admin_force_logout'),
+    # Two-Factor Authentication endpoints (SCRUM-14)
+    path('2fa/setup/', TwoFactorSetupView.as_view(), name='2fa_setup'),
+    path('2fa/verify-setup/', TwoFactorVerifySetupView.as_view(), name='2fa_verify_setup'),
+    path('2fa/disable/', TwoFactorDisableView.as_view(), name='2fa_disable'),
+    path('2fa/verify-code/', TwoFactorVerifyCodeView.as_view(), name='2fa_verify_code'),
+    path('2fa/backup-codes/', BackupCodesRegenerateView.as_view(), name='2fa_backup_codes'),
 ]

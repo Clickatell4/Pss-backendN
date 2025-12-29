@@ -58,6 +58,28 @@ class User(AbstractBaseUser, PermissionsMixin):
     # SCRUM-9: Password expiry tracking (90-day policy)
     password_last_changed = models.DateTimeField(default=timezone.now)
 
+    # SCRUM-14: Two-Factor Authentication
+    totp_secret = EncryptedCharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Encrypted TOTP secret (base32)"
+    )
+    totp_enabled = models.BooleanField(
+        default=False,
+        help_text="Whether 2FA is enabled for this user"
+    )
+    totp_enabled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When 2FA was enabled"
+    )
+    totp_last_used = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last successful 2FA verification"
+    )
+
     objects = UserManager()
 
     USERNAME_FIELD = 'email'

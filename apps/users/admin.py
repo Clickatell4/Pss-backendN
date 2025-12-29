@@ -10,10 +10,72 @@ from .popia_models import (
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ['email', 'first_name', 'last_name', 'role', 'has_completed_intake', 'date_joined', 'is_staff']
-    list_filter = ['role', 'has_completed_intake', 'date_joined', 'is_staff']
+    list_display = ['email', 'first_name', 'last_name', 'role', 'totp_badge', 'has_completed_intake', 'date_joined', 'is_staff']
+    list_filter = ['role', 'totp_enabled', 'has_completed_intake', 'date_joined', 'is_staff']
     search_fields = ['email', 'first_name', 'last_name']
     ordering = ('email',)
+    actions = ['disable_2fa_recovery']
+
+    def totp_badge(self, obj):
+        """
+        Display 2FA status with icon.
+
+        SCRUM-14: Shows whether user has 2FA enabled
+        - 🔒 Green: 2FA enabled
+        - 🔓 Gray: 2FA disabled
+        """
+        if obj.totp_enabled:
+            return format_html(
+                '<span style="color: #28a745; font-size: 16px;" title="2FA Enabled">🔒</span>'
+            )
+        else:
+            return format_html(
+                '<span style="color: #6c757d; font-size: 16px;" title="2FA Disabled">🔓</span>'
+            )
+    totp_badge.short_description = '2FA'
+
+    def disable_2fa_recovery(self, request, queryset):
+        """
+        Admin action to disable 2FA for selected users (emergency recovery only).
+
+        SCRUM-14: Allows admins to disable 2FA for users who lost access to
+        their authenticator app. This is an emergency recovery mechanism.
+
+        Security:
+        - Requires admin authentication
+        - Deletes all backup codes
+        - Clears TOTP secret
+        - Logged to audit trail
+        """
+        count = 0
+        for user in queryset:
+            if user.totp_enabled:
+                # Disable 2FA
+                user.totp_secret = None
+                user.totp_enabled = False
+                user.totp_enabled_at = None
+                user.totp_last_used = None
+                user.save(update_fields=['totp_secret', 'totp_enabled', 'totp_enabled_at', 'totp_last_used'])
+
+                # Delete all backup codes
+                from apps.authentication.models import TwoFactorBackupCode
+                TwoFactorBackupCode.objects.filter(user=user).delete()
+
+                count += 1
+
+                # Log admin action
+                import logging
+                logger = logging.getLogger('django.security.auth')
+                logger.warning(
+                    f"ADMIN 2FA RECOVERY | Admin: {request.user.email} | "
+                    f"Target: {user.email} | Reason: Admin override"
+                )
+
+        self.message_user(
+            request,
+            f'Disabled 2FA for {count} user(s). Users will need to re-enable 2FA on next login (if admin/superuser).'
+        )
+    disable_2fa_recovery.short_description = 'Disable 2FA (Emergency Recovery)'
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
