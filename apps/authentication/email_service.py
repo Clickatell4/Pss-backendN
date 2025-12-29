@@ -30,7 +30,7 @@ def send_email(subject, to, template_name, context):
         msg.attach_alternative(html_body, "text/html")
         msg.send()
 
-        logger.info(f"Email sent successfully to {to}")
+        logger.info(f"Email sent successfully - Template: {template_name}")
 
     except Exception as e:
-        logger.error(f"Failed to send email to {to}: {str(e)}")
+        logger.error(f"Failed to send email - Template: {template_name}, Error: {str(e)}")

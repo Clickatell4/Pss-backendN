@@ -8,6 +8,8 @@ from .views import (
     CreateSuperuserView,
     PasswordResetRequestView,
     PasswordResetConfirmView,
+    PasswordChangeView,
+    PasswordResetValidateTokenView,
 )
 
 urlpatterns = [
@@ -22,5 +24,9 @@ urlpatterns = [
 
     # Password reset
     path("password-reset/request/", PasswordResetRequestView.as_view(), name="password-reset-request"),
+    path("password-reset/validate-token/", PasswordResetValidateTokenView.as_view(), name="password-reset-validate"),
     path("password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
+
+    # Password change endpoint for authenticated users
+    path("password-change/", PasswordChangeView.as_view(), name="password-change"),
 ]

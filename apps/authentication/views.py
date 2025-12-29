@@ -2,6 +2,7 @@ from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.conf import settings
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -19,7 +20,10 @@ from pss_backend.throttles import (
     PasswordResetConfirmThrottle
 )
 from apps.authentication.models import PasswordResetToken
+from apps.authentication.serializers import PasswordChangeSerializer
+from apps.authentication.email_utils import send_password_reset_email, send_password_change_confirmation_email
 from apps.authentication.email_service import send_email
+from apps.users.popia_models import PasswordHistory
 
 import logging
 
@@ -242,7 +246,57 @@ class PasswordResetRequestView(APIView):
         except User.DoesNotExist:
             pass
 
-        return Response({"message": "If the account exists, a reset link has been sent."})
+        # Always return success message (security: don't reveal if email exists)
+        return Response({
+            'message': 'If an account with that email exists, a password reset link has been sent.',
+            'detail': 'Please check your email for instructions.'
+        }, status=status.HTTP_200_OK)
+
+    def _get_client_ip(self, request):
+        """Extract client IP address from request."""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+    def _send_reset_email(self, user, token):
+        """Send password reset email to user."""
+        # Use the new email utility for better formatted emails
+        send_password_reset_email(user, token)
+
+
+class PasswordResetValidateTokenView(APIView):
+    """
+    Validate a password reset token without consuming it.
+    Useful for frontend to check if token is valid before showing form.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        token = request.data.get('token')
+
+        if not token:
+            return Response({
+                'valid': False,
+                'detail': 'Token is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verify token
+        reset_token = PasswordResetToken.verify_token(token)
+
+        if reset_token:
+            return Response({
+                'valid': True,
+                'email': reset_token.user.email,
+                'detail': 'Token is valid'
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'valid': False,
+                'detail': 'Token is invalid, expired, or already used'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ============================================================================
@@ -280,4 +334,157 @@ class PasswordResetConfirmView(APIView):
         reset_token.mark_as_used()
         OutstandingToken.objects.filter(user=user).delete()
 
+        # Log successful password reset
+        logger.info(
+            f"Password reset successful for {user.email} from {self._get_client_ip(request)}"
+        )
+
+        return Response({
+            'message': 'Password has been reset successfully',
+            'detail': 'You can now log in with your new password'
+        }, status=status.HTTP_200_OK)
+
+    def _get_client_ip(self, request):
+        """Extract client IP address from request."""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+
+# =============================================================================
+# PASSWORD CHANGE VIEW (SCRUM-117)
+# For authenticated users to change their own password
+# =============================================================================
+
+class PasswordChangeView(APIView):
+    """
+    Change password for authenticated user.
+    
+    Security Features:
+    - Requires old password verification (prevents takeover via session hijacking)
+    - Validates new password against Django's password validators
+    - Prevents password reuse (checks history)
+    - Invalidates all other sessions after change
+    - Tracks password change in history
+    - Logs all password change attempts
+    - Rate limited
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        """
+        Change password for the authenticated user.
+        
+        Request body:
+        {
+            "old_password": "current_password",
+            "new_password": "new_secure_password"
+        }
+        """
+        serializer = PasswordChangeSerializer(
+            data=request.data,
+            context={'user': request.user}
+        )
+
+        if not serializer.is_valid():
+            logger.warning(
+                f"Password change validation failed for {request.user.email}: {serializer.errors}"
+            )
+            return Response({
+                'detail': 'Password change validation failed',
+                'errors': serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Extract validated data
+        old_password = serializer.validated_data['old_password']
+        new_password = serializer.validated_data['new_password']
+        user = request.user
+
+        # Additional security: Double-check old password
+        if not user.check_password(old_password):
+            logger.warning(
+                f"Password change attempted with wrong old password for {user.email}"
+            )
+            return Response({
+                'detail': 'Old password is incorrect',
+                'errors': {'old_password': ['Password is incorrect']}
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if new password is same as old password
+        if user.check_password(new_password):
+            logger.info(
+                f"Password change rejected: new password same as old for {user.email}"
+            )
+            return Response({
+                'detail': 'New password cannot be the same as your old password',
+                'errors': {'new_password': ['Please choose a different password.']}
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Store old password in history before changing
+            old_password_hash = user.password
+            
+            # Update password
+            user.set_password(new_password)
+            user.password_last_changed = timezone.now()
+            user.save(update_fields=['password', 'password_last_changed'])
+
+            # Store in password history (SCRUM-9: prevent reuse)
+            PasswordHistory.objects.create(
+                user=user,
+                password_hash=old_password_hash
+            )
+
+            logger.info(
+                f"Password changed successfully for {user.email} from {self._get_client_ip(request)}"
+            )
+
+            # Security best practice: Invalidate all other sessions
+            # This forces user to stay logged in only to the current session
+            try:
+                # Get all tokens except current one
+                from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+                
+                # Invalidate all refresh tokens for this user
+                OutstandingToken.objects.filter(user=user).delete()
+                
+                logger.info(f"All sessions invalidated for {user.email} after password change")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to invalidate sessions for {user.email} after password change: {str(e)}"
+                )
+
+            # Send confirmation email
+            self._send_password_change_confirmation_email(user)
+
+            return Response({
+                'message': 'Password changed successfully',
+                'detail': 'Your password has been updated. You may need to log in again on other devices.'
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Error changing password for {user.email}: {str(e)}")
+            return Response({
+                'detail': 'Failed to change password'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def _get_client_ip(self, request):
+        """Extract client IP address from request."""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            ip = x_forwarded_for.split(',')[0]
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+        return ip
+
+    def _send_password_change_confirmation_email(self, user):
+        """Send confirmation email after successful password change."""
+        # Use the new email utility for better formatted emails
+        send_password_change_confirmation_email(user)
+=======
         return Response({"message": "Password has been reset successfully."})
+>>>>>>> origin/main
