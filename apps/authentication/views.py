@@ -11,7 +11,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 
 from apps.users.serializers import UserSerializer
-from apps.users.permissions import IsSuperuser
+from apps.users.permissions import IsSuperuser, IsAdminOrSuperuser
 from pss_backend.validators import sanitize_text, validate_email_domain, validate_text_length
 from pss_backend.throttles import (
     AuthRateThrottle,

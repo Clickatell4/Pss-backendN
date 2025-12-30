@@ -1,3 +1,10 @@
+"""
+Django Base Settings
+
+Shared configuration across all environments (local, testing, production).
+Environment-specific settings are in local.py, testing.py, and production.py.
+"""
+
 # Custom authentication backend for email login
 AUTHENTICATION_BACKENDS = [
     'axes.backends.AxesStandaloneBackend',  # SCRUM-10: Must be first for rate limiting
@@ -20,7 +27,7 @@ import dj_database_url
 _secrets_logger = logging.getLogger('django.security.secrets')
 
 # Build paths
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # =============================================================================
 # SECRET_KEY Configuration (CRITICAL SECURITY)
@@ -90,12 +97,6 @@ _secrets_logger.info(
     "SECRET_KEY loaded successfully (length: %d, first 4 chars: %s...)",
     len(SECRET_KEY), SECRET_KEY[:4]
 )
-
-# =============================================================================
-# Core Django Settings
-# =============================================================================
-DEBUG = config('DEBUG', cast=bool, default=False)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv(), default='localhost,127.0.0.1')
 
 # Field-level encryption key for PII data (POPIA compliance)
 # IMPORTANT: Generate a unique key for production using: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -167,7 +168,7 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
-            BASE_DIR / 'pss_backend' / 'templates'   # <-- ADD THIS
+            BASE_DIR / 'pss_backend' / 'templates'
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -181,28 +182,7 @@ TEMPLATES = [
     },
 ]
 
-
 WSGI_APPLICATION = 'pss_backend.wsgi.application'
-
-# --------------------------------------------------------
-# DATABASE
-# --------------------------------------------------------
-DATABASE_URL = config('DATABASE_URL', default=None)
-
-if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.parse(
-            DATABASE_URL, conn_max_age=600, ssl_require=True
-        )
-    }
-else:
-    # Local development SQLite
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
 
 # --------------------------------------------------------
 # PASSWORD VALIDATION
@@ -235,20 +215,6 @@ LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Africa/Johannesburg'
 USE_I18N = True
 USE_TZ = True
-
-# --------------------------------------------------------
-# STATIC + MEDIA
-# --------------------------------------------------------
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
-if (BASE_DIR / 'static').exists():
-    STATICFILES_DIRS = [BASE_DIR / 'static']
-
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
 
 # --------------------------------------------------------
 # CUSTOM USER MODEL
@@ -296,13 +262,11 @@ SIMPLE_JWT = {
 # =============================================================================
 # Integrates with rate limiting (SCRUM-10) to add human verification layer
 
-# Enable/disable CAPTCHA (useful for testing)
-CAPTCHA_ENABLED = config('CAPTCHA_ENABLED', cast=bool, default=True)
-
 # CAPTCHA provider ('recaptcha', 'hcaptcha', 'turnstile')
 CAPTCHA_PROVIDER = config('CAPTCHA_PROVIDER', default='recaptcha')
 
 # Failed attempts before requiring CAPTCHA (per IP + email combination)
+# This will be overridden in environment-specific settings
 CAPTCHA_TRIGGER_THRESHOLD = config('CAPTCHA_TRIGGER_THRESHOLD', cast=int, default=3)
 
 # Cache timeout for failed login attempts (15 minutes)
@@ -319,37 +283,15 @@ CAPTCHA_BYPASS_IPS = config('CAPTCHA_BYPASS_IPS', cast=Csv(), default='')
 # CAPTCHA applies to these actions
 CAPTCHA_PROTECTED_ACTIONS = ['login', 'register', 'password_reset']
 
-_secrets_logger.info(
-    "CAPTCHA enabled: %s, provider: %s, trigger threshold: %d attempts",
-    CAPTCHA_ENABLED, CAPTCHA_PROVIDER, CAPTCHA_TRIGGER_THRESHOLD
-)
 # =============================================================================
-
+# CORS CONFIGURATION (Base)
 # =============================================================================
-# CORS CONFIGURATION (SCRUM-41 — Harden Production CORS)
-# =============================================================================
+# Environment-specific CORS_ALLOWED_ORIGINS are set in local.py, testing.py, production.py
 
-# ---- Allowed production origins (STRICT) ----
-PRODUCTION_CORS_ORIGINS = [
-    "https://pss-frontend-ebon.vercel.app",
-]
-
-# ---- Allowed development origins ----
-DEVELOPMENT_CORS_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-
-# ---- Switch based on DEBUG mode ----
-if DEBUG:
-    CORS_ALLOWED_ORIGINS = DEVELOPMENT_CORS_ORIGINS
-else:
-    CORS_ALLOWED_ORIGINS = PRODUCTION_CORS_ORIGINS
-
-# ---- Do NOT ever allow wildcard origins ----
+# Do NOT ever allow wildcard origins
 CORS_ALLOW_ALL_ORIGINS = False
 
-# ---- Allowed HTTP methods ----
+# Allowed HTTP methods
 CORS_ALLOWED_METHODS = [
     "GET",
     "POST",
@@ -359,7 +301,7 @@ CORS_ALLOWED_METHODS = [
     "OPTIONS",
 ]
 
-# ---- Allowed headers ----
+# Allowed headers
 CORS_ALLOWED_HEADERS = [
     "Authorization",
     "Content-Type",
@@ -368,30 +310,24 @@ CORS_ALLOWED_HEADERS = [
     "User-Agent",
 ]
 
-# ---- Whether cookies/JWT tokens can be sent ----
+# Whether cookies/JWT tokens can be sent
 CORS_ALLOW_CREDENTIALS = True
 
-# ---- Cache preflight (OPTIONS) responses ----
+# Cache preflight (OPTIONS) responses
 CORS_MAX_AGE = 86400  # 1 day
-# =============================================================================
 
-# --------------------------------------------------------
-# SECURITY HEADERS
-# --------------------------------------------------------
+# =============================================================================
+# SECURITY HEADERS (Base)
+# =============================================================================
+# Environment-specific security headers are set in local.py, testing.py, production.py
+
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', cast=bool, default=False)
-SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', cast=bool, default=False)
-SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', cast=int, default=0)
-SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', cast=bool, default=False)
-SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', cast=bool, default=False)
 X_FRAME_OPTIONS = 'DENY'
 
 # CSRF Protection (OWASP A01:2021 - Broken Access Control)
-CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', cast=bool, default=False)
 CSRF_COOKIE_HTTPONLY = True  # Prevent JavaScript access to CSRF cookie
 CSRF_COOKIE_SAMESITE = 'Lax'  # Protect against CSRF while allowing normal navigation
-CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv(), default='http://localhost:5173,http://127.0.0.1:5173')
 
 # Additional security headers
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
@@ -407,10 +343,18 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
 
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'level': 'INFO',
+            'formatter': 'verbose',
         },
         'file': {
             'class': 'logging.handlers.RotatingFileHandler',
@@ -418,6 +362,7 @@ LOGGING = {
             'maxBytes': 1024 * 1024 * 10,
             'backupCount': 5,
             'level': 'WARNING',
+            'formatter': 'verbose',
         },
     },
 
@@ -451,21 +396,6 @@ LOGGING = {
 # DEFAULT AUTO FIELD
 # --------------------------------------------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# =============================================================================
-# AUDIT LOGGING (SCRUM-8 - POPIA Compliance)
-# =============================================================================
-# Django Auditlog - Tracks all changes to sensitive data
-# Required for POPIA compliance and security monitoring
-
-# Log retention: 2 years minimum for POPIA compliance
-# Note: Implement cleanup script for logs older than 2 years
-# AUDITLOG_INCLUDE_TRACKING_MODELS = True  # Track all registered models
-
-# Disable audit logging for select models (if needed)
-# AUDITLOG_EXCLUDE_TRACKING_MODELS = ['SomeModel']
-
-# =============================================================================
 
 # =============================================================================
 # RATE LIMITING & BRUTE FORCE PROTECTION (SCRUM-10)
@@ -508,24 +438,14 @@ AXES_NEVER_LOCKOUT_WHITELIST = []
 
 # Use custom lockout response (will be JSON for API)
 AXES_LOCKOUT_TEMPLATE = None  # Returns 403 JSON response
-# =============================================================================
 
 # =============================================================================
-# EMAIL CONFIGURATION (SCRUM-117 - Password Reset)
+# EMAIL CONFIGURATION (Base)
 # =============================================================================
 # Email backend configuration for sending password reset emails
-# Use console backend in development, SMTP in production
+# Environment-specific backends are set in local.py, testing.py, production.py
 
-# Frontend URL for password reset links
-FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
-
-# Email backend (console for dev, SMTP for production)
-EMAIL_BACKEND = config(
-    'EMAIL_BACKEND',
-    default='django.core.mail.backends.console.EmailBackend'
-)
-
-# SMTP Configuration (only used if EMAIL_BACKEND is set to SMTP)
+# SMTP Configuration (only used if EMAIL_BACKEND is set to SMTP in env-specific files)
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', cast=int, default=587)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool, default=True)
@@ -533,20 +453,6 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@capaciti.org.za')
 
-# Log email configuration (without exposing credentials)
-_secrets_logger.info(
-    "Email backend: %s (SMTP host: %s, port: %s, from: %s)",
-    EMAIL_BACKEND.split('.')[-1],
-    EMAIL_HOST if EMAIL_BACKEND != 'django.core.mail.backends.console.EmailBackend' else 'N/A',
-    EMAIL_PORT if EMAIL_BACKEND != 'django.core.mail.backends.console.EmailBackend' else 'N/A',
-    DEFAULT_FROM_EMAIL
-)
-
-if EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
-    _secrets_logger.warning(
-        "Using console email backend - emails will be printed to console (development only)"
-    )
-# =============================================================================
 # =============================================================================
 # EMAIL NOTIFICATIONS SYSTEM (SCRUM-28)
 # =============================================================================
@@ -556,7 +462,6 @@ if EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend':
 # - Admin notification email
 # - Retry policy
 # - Feature toggles for queueing
-# =============================================================================
 
 # Directory paths for email templates
 EMAIL_TEMPLATE_DIR = BASE_DIR / "templates" / "emails"
@@ -589,14 +494,6 @@ CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default=CELERY_BROKER_UR
 CELERY_TASK_ALWAYS_EAGER = not EMAIL_QUEUE_ENABLED
 CELERY_TASK_EAGER_PROPAGATES = True
 
-# Logging for visibility
-_secrets_logger.info(
-    "Email notification system enabled=%s, queue=%s, SMTP backend=%s",
-    EMAIL_NOTIFICATIONS_ENABLED,
-    EMAIL_QUEUE_ENABLED,
-    EMAIL_BACKEND.split('.')[-1],
-)
-
 # =============================================================================
 # INACTIVE ACCOUNT RETENTION (SCRUM-119 - POPIA Section 14)
 # =============================================================================
@@ -615,4 +512,3 @@ _secrets_logger.info(
     "Inactive account deletion: threshold=%d years, grace period=%d days",
     INACTIVE_ACCOUNT_THRESHOLD_YEARS, INACTIVE_ACCOUNT_GRACE_PERIOD_DAYS
 )
-# =============================================================================

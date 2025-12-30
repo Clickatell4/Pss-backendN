@@ -303,7 +303,6 @@ class UserSession(models.Model):
         return f"{self.user.email} - {self.device_type} ({status})"
 
 
-<<<<<<< HEAD
 # =============================================================================
 # SCRUM-14: Two-Factor Authentication Backup Codes
 # =============================================================================

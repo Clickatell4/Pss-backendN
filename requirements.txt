@@ -17,6 +17,9 @@ user-agents==2.2.0  # SCRUM-30: User agent parsing for device detection
 pyotp==2.9.0  # SCRUM-14: TOTP generation and verification
 qrcode==7.4.2  # SCRUM-14: QR code generation for authenticator apps
 
+# Supabase integration (for testing environment)
+supabase==2.10.0  # Supabase Python client (includes storage3)
+
 # Testing dependencies
 pytest==8.3.4
 pytest-django==4.9.0

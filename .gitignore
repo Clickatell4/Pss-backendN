@@ -274,17 +274,23 @@ postman_collection.json
 # =============================================================================
 # Secrets Management (SCRUM-26)
 # =============================================================================
-# Environment files with secrets
+# Environment files with secrets - DO NOT COMMIT
 .env
-.env.*
-!.env.example
+.env.local
+.env.testing
 .env.production
-.env.staging
-.env.development
+
+# Allow example/template environment files (these should be committed)
+!.env.local.example
+!.env.testing.example
+!.env.production.example
+!.env.example
 
 # Encrypted secrets (git-secret)
 # Note: .secret files ARE tracked as they contain encrypted data
-# But plain-text versions must never be committed
+# Plain-text .env.testing and .env.production should be encrypted with git-secret
+.env.testing.secret
+.env.production.secret
 
 # Secret keys and credentials
 *.pem
@@ -309,4 +315,4 @@ secrets.json
 
 # Docker secrets
 docker-secrets/
-.docker-secrets
+.docker-secrets.env.render
