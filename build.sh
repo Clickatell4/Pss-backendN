@@ -9,8 +9,6 @@ pip install -r requirements.txt
 # Collect static files (no input required)
 python manage.py collectstatic --no-input
 
-# Run database migrations
-python manage.py migrate --noinput
-
-# Create superuser from environment variables (if not exists)
-python manage.py create_superuser_auto
+# Note: Migrations will run automatically on first request via release command
+# Render's build environment can't connect to external databases
+echo "Build completed successfully. Migrations will run on startup."
