@@ -29,6 +29,14 @@ DATABASES = {
     )
 }
 
+# Add connection options for Render + Supabase compatibility
+DATABASES['default']['OPTIONS'] = {
+    'sslmode': 'require',
+    'connect_timeout': 10,
+    'options': '-c statement_timeout=30000',  # 30 second timeout
+}
+DATABASES['default']['CONN_MAX_AGE'] = 0  # Disable connection pooling to avoid stale IPv6 connections
+
 _secrets_logger.info(
     "Database: Supabase PostgreSQL (%s)",
     DATABASES['default']['HOST']
