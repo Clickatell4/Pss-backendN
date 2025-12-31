@@ -419,7 +419,8 @@ AXES_ONLY_USER_FAILURES = False
 AXES_RESET_ON_SUCCESS = True
 
 # Enable axes globally
-AXES_ENABLED = True
+# TEMPORARY: Disabled to test database connection without Axes queries
+AXES_ENABLED = False
 
 # Log lockout attempts for security monitoring
 AXES_VERBOSE = True
