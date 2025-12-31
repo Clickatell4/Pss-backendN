@@ -1,0 +1,1280 @@
+{
+	"info": {
+		"_postman_id": "pss-backend-testing-2025",
+		"name": "PSS Backend - Testing Environment",
+		"description": "Complete API collection for PSS Backend testing environment\n\nBase URL: https://pss-backend-testing.onrender.com\n\nFeatures:\n- 70+ endpoints covering all functionality\n- Automatic token management\n- Pre-configured test assertions\n- Sample test data included\n\nDocumentation: See /docs/confluence/ for comprehensive guides",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "🔐 Authentication",
+			"item": [
+				{
+					"name": "Login (Candidate)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.access) {",
+									"        pm.environment.set('access_token', response.access);",
+									"        pm.environment.set('refresh_token', response.refresh);",
+									"        pm.environment.set('user_id', response.user.id);",
+									"        pm.environment.set('user_email', response.user.email);",
+									"    }",
+									"    pm.test('Login successful', () => {",
+									"        pm.expect(response).to.have.property('access');",
+									"        pm.expect(response).to.have.property('user');",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"candidate.test@capaciti.org.za\",\n    \"password\": \"TestPass123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login", ""]
+						},
+						"description": "Authenticate as candidate and receive JWT tokens"
+					}
+				},
+				{
+					"name": "Login (Admin)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    if (response.access) {",
+									"        pm.environment.set('access_token', response.access);",
+									"        pm.environment.set('refresh_token', response.refresh);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"admin.test@capaciti.org.za\",\n    \"password\": \"AdminPass123!\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "login", ""]
+						},
+						"description": "Login as admin user (requires 2FA if enabled)"
+					}
+				},
+				{
+					"name": "Get Current User (/auth/me/)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/me/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "me", ""]
+						},
+						"description": "Get current authenticated user details"
+					}
+				},
+				{
+					"name": "Register New Candidate",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"newuser@capaciti.org.za\",\n    \"password\": \"NewUser123!\",\n    \"first_name\": \"New\",\n    \"last_name\": \"User\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "register", ""]
+						}
+					}
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refresh\": \"{{refresh_token}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/logout/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "logout", ""]
+						}
+					}
+				}
+			],
+			"description": "Authentication endpoints for login, logout, registration"
+		},
+		{
+			"name": "🔑 Password Management",
+			"item": [
+				{
+					"name": "Request Password Reset",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"test@capaciti.org.za\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/password-reset/request/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "password-reset", "request", ""]
+						}
+					}
+				},
+				{
+					"name": "Validate Reset Token",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"token\": \"your-reset-token-here\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/password-reset/validate-token/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "password-reset", "validate-token", ""]
+						}
+					}
+				},
+				{
+					"name": "Confirm Password Reset",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"token\": \"your-reset-token-here\",\n    \"new_password\": \"NewPassword123!\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/password-reset/confirm/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "password-reset", "confirm", ""]
+						}
+					}
+				},
+				{
+					"name": "Change Password (Authenticated)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"old_password\": \"CurrentPassword123!\",\n    \"new_password\": \"NewPassword456!\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/password-change/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "password-change", ""]
+						}
+					}
+				}
+			],
+			"description": "Password reset and change functionality"
+		},
+		{
+			"name": "🔒 Two-Factor Authentication (2FA)",
+			"item": [
+				{
+					"name": "Setup 2FA",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/2fa/setup/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "2fa", "setup", ""]
+						},
+						"description": "Initiates 2FA setup, returns QR code"
+					}
+				},
+				{
+					"name": "Verify 2FA Setup",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"totp_code\": \"123456\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/2fa/verify-setup/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "2fa", "verify-setup", ""]
+						}
+					}
+				},
+				{
+					"name": "Verify 2FA Code (Login)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"admin.test@capaciti.org.za\",\n    \"code\": \"123456\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/2fa/verify-code/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "2fa", "verify-code", ""]
+						}
+					}
+				},
+				{
+					"name": "Disable 2FA",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"password\": \"CurrentPassword123!\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/2fa/disable/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "2fa", "disable", ""]
+						}
+					}
+				},
+				{
+					"name": "Regenerate Backup Codes",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"password\": \"CurrentPassword123!\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/2fa/backup-codes/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "2fa", "backup-codes", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "📱 Session Management",
+			"item": [
+				{
+					"name": "List My Sessions",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/sessions/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "sessions", ""]
+						}
+					}
+				},
+				{
+					"name": "Terminate All Sessions",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/sessions/all/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "sessions", "all", ""]
+						}
+					}
+				},
+				{
+					"name": "Terminate All Except Current",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/sessions/all-except-current/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "sessions", "all-except-current", ""]
+						}
+					}
+				},
+				{
+					"name": "Admin: List All Sessions",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/admin/sessions/?active_only=true",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "admin", "sessions", ""],
+							"query": [
+								{
+									"key": "user_email",
+									"value": "test@capaciti.org.za",
+									"disabled": true
+								},
+								{
+									"key": "active_only",
+									"value": "true"
+								},
+								{
+									"key": "suspicious_only",
+									"value": "false",
+									"disabled": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Admin: Force Logout User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"user_id\": 123,\n    \"reason\": \"Suspicious activity detected\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/admin/force-logout/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "auth", "admin", "force-logout", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "👥 User Management",
+			"item": [
+				{
+					"name": "List All Users",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", ""]
+						}
+					}
+				},
+				{
+					"name": "Get User Details",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/{{user_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "{{user_id}}", ""]
+						}
+					}
+				},
+				{
+					"name": "Update User Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"first_name\": \"Updated\",\n    \"last_name\": \"Name\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/users/{{user_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "{{user_id}}", ""]
+						}
+					}
+				},
+				{
+					"name": "Get User Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/{{user_id}}/profile/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "{{user_id}}", "profile", ""]
+						}
+					}
+				},
+				{
+					"name": "List Candidates",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/users/candidates/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "users", "candidates", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "📝 Intake Form",
+			"item": [
+				{
+					"name": "Submit Intake Form",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"intake_data\": {\n        \"id_number\": \"9001015009087\",\n        \"contact_number\": \"+27123456789\",\n        \"address\": \"123 Test Street, Cape Town\",\n        \"emergency_contact\": \"Jane Doe\",\n        \"emergency_phone\": \"+27987654321\",\n        \"diagnosis\": \"ADHD\",\n        \"medications\": \"Ritalin 10mg\",\n        \"allergies\": \"None\",\n        \"medical_notes\": \"Additional medical information\",\n        \"doctor_name\": \"Dr. Smith\",\n        \"doctor_phone\": \"+27111111111\",\n        \"accommodations\": \"Quiet testing room\",\n        \"assistive_technology\": \"Text-to-speech software\",\n        \"learning_style\": \"Visual\",\n        \"support_needs\": \"Extended time for assessments\",\n        \"communication_preferences\": \"Email preferred\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/intake/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "intake", ""]
+						}
+					}
+				},
+				{
+					"name": "Get User Intake Details",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/intake/{{user_id}}/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "intake", "{{user_id}}", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "📖 Journal",
+			"item": [
+				{
+					"name": "List Journal Entries",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/journal/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "journal", ""]
+						}
+					}
+				},
+				{
+					"name": "Create Journal Entry",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"date\": \"2025-01-15\",\n    \"mood\": \"happy\",\n    \"energy_level\": 7,\n    \"activities\": \"Attended classes, completed assignment\",\n    \"challenges\": \"Difficulty focusing in afternoon\",\n    \"achievements\": \"Submitted assignment on time\",\n    \"notes\": \"Good productive day overall\",\n    \"barriers_faced\": \"Crowded classroom environment\",\n    \"barrier_count\": 2\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/journal/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "journal", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Journal Entry",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/journal/1/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "journal", "1", ""]
+						}
+					}
+				},
+				{
+					"name": "Update Journal Entry",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"mood\": \"neutral\",\n    \"notes\": \"Updated notes\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/journal/1/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "journal", "1", ""]
+						}
+					}
+				},
+				{
+					"name": "Delete Journal Entry",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/journal/1/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "journal", "1", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Journal Statistics",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/journal/stats/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "journal", "stats", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "📋 Admin Notes",
+			"item": [
+				{
+					"name": "List Admin Notes",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin-notes/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin-notes", ""]
+						}
+					}
+				},
+				{
+					"name": "Create Admin Note",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"candidate\": 5,\n    \"content\": \"Student showed improvement in focus during class\",\n    \"note_type\": \"progress\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin-notes/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin-notes", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Admin Note",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin-notes/1/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin-notes", "1", ""]
+						}
+					}
+				},
+				{
+					"name": "Get Notes for Candidate",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/admin-notes/candidate/5/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin-notes", "candidate", "5", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "📊 Dashboard",
+			"item": [
+				{
+					"name": "Admin Dashboard Stats",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/dashboard/admin-stats/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "dashboard", "admin-stats", ""]
+						}
+					}
+				},
+				{
+					"name": "Candidate Dashboard Stats",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/dashboard/candidate-stats/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "dashboard", "candidate-stats", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🔐 POPIA/GDPR Compliance",
+			"item": [
+				{
+					"name": "Get Privacy Policy",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/popia/privacy-policy/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "popia", "privacy-policy", ""]
+						}
+					}
+				},
+				{
+					"name": "List My Consents",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/popia/consents/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "popia", "consents", ""]
+						}
+					}
+				},
+				{
+					"name": "Grant Consent",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"consent_type\": \"marketing\",\n    \"version\": \"1.0\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/popia/consents/grant/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "popia", "consents", "grant", ""]
+						}
+					}
+				},
+				{
+					"name": "Withdraw Consent",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/popia/consents/1/withdraw/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "popia", "consents", "1", "withdraw", ""]
+						}
+					}
+				},
+				{
+					"name": "Export My Data",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/popia/data-export/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "popia", "data-export", ""]
+						}
+					}
+				},
+				{
+					"name": "Request Account Deletion",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"reason\": \"Leaving institution\",\n    \"feedback\": \"Optional feedback about the process\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/popia/deletion-requests/create/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "popia", "deletion-requests", "create", ""]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "✅ Health Check",
+			"item": [
+				{
+					"name": "Root Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": ["{{base_url}}"],
+							"path": [""]
+						}
+					}
+				},
+				{
+					"name": "API Health Check",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('API is healthy', () => {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.status).to.equal('healthy');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/",
+							"host": ["{{base_url}}"],
+							"path": ["api", ""]
+						},
+						"description": "Test API connectivity and health status"
+					}
+				}
+			],
+			"description": "Health check endpoints for testing connectivity"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Auto-add base URL if not set",
+					"if (!pm.environment.get('base_url')) {",
+					"    pm.environment.set('base_url', 'https://pss-backend-testing.onrender.com');",
+					"}"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://pss-backend-testing.onrender.com",
+			"type": "string"
+		},
+		{
+			"key": "access_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refresh_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_email",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

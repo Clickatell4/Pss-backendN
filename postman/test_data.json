@@ -1,0 +1,163 @@
+{
+  "users": {
+    "candidate": {
+      "email": "candidate.test@capaciti.org.za",
+      "password": "TestPass123!",
+      "first_name": "Test",
+      "last_name": "Candidate"
+    },
+    "admin": {
+      "email": "admin.test@capaciti.org.za",
+      "password": "AdminPass123!",
+      "first_name": "Test",
+      "last_name": "Admin"
+    },
+    "superuser": {
+      "email": "super.test@capaciti.org.za",
+      "password": "SuperPass123!",
+      "first_name": "Test",
+      "last_name": "Superuser"
+    }
+  },
+  "intake_sample": {
+    "id_number": "9001015009087",
+    "contact_number": "+27123456789",
+    "address": "123 Test Street, Cape Town, 8001",
+    "emergency_contact": "Jane Doe",
+    "emergency_phone": "+27987654321",
+    "diagnosis": "ADHD",
+    "medications": "Ritalin 10mg daily",
+    "allergies": "Penicillin",
+    "medical_notes": "Additional medical information here",
+    "doctor_name": "Dr. John Smith",
+    "doctor_phone": "+27111111111",
+    "accommodations": "Quiet testing room, extra time",
+    "assistive_technology": "Screen reader, text-to-speech software",
+    "learning_style": "Visual and kinesthetic",
+    "support_needs": "Extended time for assessments, note-taking assistance",
+    "communication_preferences": "Email preferred, CC on all communications"
+  },
+  "journal_samples": [
+    {
+      "date": "2025-01-15",
+      "mood": "happy",
+      "energy_level": 7,
+      "activities": "Attended all classes, completed group project",
+      "challenges": "Difficulty focusing during afternoon lectures",
+      "achievements": "Submitted assignment on time, received positive feedback",
+      "notes": "Overall productive day, feeling motivated",
+      "barriers_faced": "Crowded classroom environment, background noise",
+      "barrier_count": 2
+    },
+    {
+      "date": "2025-01-16",
+      "mood": "neutral",
+      "energy_level": 5,
+      "activities": "Study session, met with tutor",
+      "challenges": "Struggled with complex concepts in programming",
+      "achievements": "Made progress on understanding algorithms",
+      "notes": "Need more practice with data structures",
+      "barriers_faced": "Limited access to quiet study space",
+      "barrier_count": 1
+    },
+    {
+      "date": "2025-01-17",
+      "mood": "anxious",
+      "energy_level": 4,
+      "activities": "Exam preparation, reviewed notes",
+      "challenges": "Feeling overwhelmed by upcoming assessment",
+      "achievements": "Created study schedule for the week",
+      "notes": "Need to manage stress better",
+      "barriers_faced": "Test anxiety, time management challenges",
+      "barrier_count": 3
+    }
+  ],
+  "admin_note_samples": [
+    {
+      "note_type": "progress",
+      "content": "Student has shown significant improvement in class participation over the past month. More engaged in discussions and asking relevant questions."
+    },
+    {
+      "note_type": "observation",
+      "content": "Observed that student performs better in smaller group settings. May benefit from more collaborative learning opportunities."
+    },
+    {
+      "note_type": "concern",
+      "content": "Student has missed several assignment deadlines recently. Follow-up conversation recommended to understand if additional support is needed."
+    },
+    {
+      "note_type": "recommendation",
+      "content": "Recommend extending time accommodations for assessments based on recent performance patterns. Also suggest regular check-ins with learning support."
+    }
+  ],
+  "test_scenarios": {
+    "password_reset": {
+      "note": "Use these steps to test password reset flow",
+      "steps": [
+        "1. Request password reset with valid email",
+        "2. Check console/email logs for reset token",
+        "3. Validate the token",
+        "4. Confirm password reset with new password",
+        "5. Login with new credentials"
+      ]
+    },
+    "2fa_setup": {
+      "note": "Steps to test 2FA setup and verification",
+      "steps": [
+        "1. Login as user without 2FA",
+        "2. Call /auth/2fa/setup/ to get QR code",
+        "3. Scan QR code with Google Authenticator or Authy",
+        "4. Get TOTP code from authenticator app",
+        "5. Verify setup with the code",
+        "6. Save backup codes (shown once)",
+        "7. Logout",
+        "8. Login again (will require 2FA)",
+        "9. Enter TOTP code to complete login"
+      ]
+    },
+    "session_management": {
+      "note": "Testing multi-device session management",
+      "steps": [
+        "1. Login from Postman (session 1)",
+        "2. Login from browser (session 2)",
+        "3. Login from cURL (session 3)",
+        "4. List all sessions - should see 3 active",
+        "5. Terminate specific session",
+        "6. Verify that session is no longer active",
+        "7. Terminate all except current",
+        "8. Verify only current session remains"
+      ]
+    }
+  },
+  "common_errors": {
+    "401_unauthorized": {
+      "error": "Invalid or expired token",
+      "solution": "Login again to get fresh access token"
+    },
+    "403_forbidden": {
+      "error": "Insufficient permissions for this action",
+      "solution": "Use account with appropriate role (admin/superuser)"
+    },
+    "400_validation": {
+      "error": "Invalid input data",
+      "solution": "Check request body matches expected format",
+      "examples": [
+        "Email must end with @capaciti.org.za",
+        "Password must meet complexity requirements",
+        "Required fields cannot be empty"
+      ]
+    },
+    "429_rate_limit": {
+      "error": "Too many requests",
+      "solution": "Wait for rate limit window to reset",
+      "limits": {
+        "login": "10 requests/minute",
+        "registration": "5 requests/hour",
+        "password_reset": "3 requests/hour"
+      }
+    }
+  },
+  "mood_choices": ["happy", "neutral", "sad", "anxious", "frustrated"],
+  "note_types": ["progress", "observation", "concern", "recommendation"],
+  "consent_types": ["marketing", "data_sharing", "research"]
+}
