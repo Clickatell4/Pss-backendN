@@ -2,6 +2,39 @@
 
 Django REST API backend for the Personal Support System (PSS) application designed for CAPACITI students with disabilities.
 
+## 🚨 Project Handover Notice
+
+**Status**: In Development - Handover in Progress
+**Date**: January 11, 2026
+**Completion**: ~60% Complete
+
+This project requires completion by **March 31, 2026**. Comprehensive handover documentation has been created for the next development team.
+
+### 📚 Essential Documentation
+
+**START HERE**: [Complete Documentation](./docs/)
+
+| Document | Description |
+|----------|-------------|
+| **[Handover Roadmap](./docs/Handover-Roadmap.md)** | **READ THIS FIRST** - Complete project plan, priorities, and timeline |
+| [Architecture Overview](./docs/Architecture.md) | System design, database schema, API structure |
+| [Development Setup](./docs/Development-Setup.md) | Local environment setup guide |
+| [Security & Compliance](./docs/Security-Compliance.md) | POPIA requirements and security guidelines |
+
+### 🎯 Quick Status
+
+- ✅ Core API functionality working
+- ✅ JWT authentication implemented
+- ✅ Basic POPIA compliance features
+- ⚠️ 20 GitHub issues remaining ([View Issues](https://github.com/Clickatell4/Pss-backendN/issues))
+- 🔴 Critical: Field-level encryption needed
+- 🔴 Critical: Test suite needed (0% coverage)
+- 🔴 Critical: Production monitoring needed
+
+See [Handover Roadmap](./docs/Handover-Roadmap.md) for complete details.
+
+---
+
 ## 🏗️ Project Structure
 
 ```
